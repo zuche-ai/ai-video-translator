@@ -1,0 +1,5 @@
+whisper
+argostranslate
+ffmpeg-python
+pysrt
+tqdm
