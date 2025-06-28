@@ -1,0 +1,1 @@
+from video_translator.transcriber import transcribe_video 
