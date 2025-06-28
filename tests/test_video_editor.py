@@ -27,7 +27,7 @@ class TestVideoEditor(unittest.TestCase):
                 os.remove(file_path)
         os.rmdir(self.temp_dir)
     
-    @patch('video_editor.ffmpeg')
+    @patch('video_translator.video_editor.ffmpeg')
     def test_burn_subtitles_success(self, mock_ffmpeg):
         """Test successful subtitle burning"""
         # Mock ffmpeg components
@@ -65,7 +65,7 @@ class TestVideoEditor(unittest.TestCase):
         
         self.assertIn("SRT file not found", str(context.exception))
     
-    @patch('video_editor.ffmpeg')
+    @patch('video_translator.video_editor.ffmpeg')
     def test_burn_subtitles_ffmpeg_not_installed(self, mock_ffmpeg):
         """Test error when ffmpeg-python is not installed"""
         mock_ffmpeg.input.side_effect = ImportError("No module named 'ffmpeg'")
@@ -75,7 +75,7 @@ class TestVideoEditor(unittest.TestCase):
         
         self.assertIn("Ffmpeg-python is not installed", str(context.exception))
     
-    @patch('video_editor.ffmpeg')
+    @patch('video_translator.video_editor.ffmpeg')
     def test_burn_subtitles_processing_fails(self, mock_ffmpeg):
         """Test error when video processing fails"""
         # Mock ffmpeg components
@@ -96,7 +96,7 @@ class TestVideoEditor(unittest.TestCase):
         
         self.assertIn("Video processing failed", str(context.exception))
     
-    @patch('video_editor.ffmpeg')
+    @patch('video_translator.video_editor.ffmpeg')
     def test_burn_subtitles_debug_mode(self, mock_ffmpeg):
         """Test subtitle burning with debug mode enabled"""
         # Mock ffmpeg components

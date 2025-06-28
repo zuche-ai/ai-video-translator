@@ -17,7 +17,7 @@ class TestSubtitles(unittest.TestCase):
     
     def test_generate_srt_success(self):
         """Test successful SRT file generation"""
-        with patch('subtitles.pysrt') as mock_pysrt:
+        with patch('video_translator.subtitles.pysrt') as mock_pysrt:
             # Mock pysrt components
             mock_subs = Mock()
             mock_pysrt.SubRipFile.return_value = mock_subs
@@ -76,7 +76,7 @@ class TestSubtitles(unittest.TestCase):
     
     def test_generate_srt_pysrt_not_installed(self):
         """Test error when pysrt is not installed"""
-        with patch('subtitles.pysrt', side_effect=ImportError("No module named 'pysrt'")):
+        with patch.dict('sys.modules', {'pysrt': None}):
             with self.assertRaises(ImportError) as context:
                 generate_srt(self.test_segments, self.test_video_path, self.test_language)
             
@@ -84,7 +84,7 @@ class TestSubtitles(unittest.TestCase):
     
     def test_generate_srt_save_fails(self):
         """Test error when SRT file save fails"""
-        with patch('subtitles.pysrt') as mock_pysrt:
+        with patch('video_translator.subtitles.pysrt') as mock_pysrt:
             mock_subs = Mock()
             mock_subs.save.side_effect = Exception("Save error")
             mock_pysrt.SubRipFile.return_value = mock_subs
@@ -96,7 +96,7 @@ class TestSubtitles(unittest.TestCase):
     
     def test_generate_srt_debug_mode(self):
         """Test SRT generation with debug mode enabled"""
-        with patch('subtitles.pysrt') as mock_pysrt:
+        with patch('video_translator.subtitles.pysrt') as mock_pysrt:
             mock_subs = Mock()
             mock_pysrt.SubRipFile.return_value = mock_subs
             
@@ -113,7 +113,7 @@ class TestSubtitles(unittest.TestCase):
             ("video_with_spaces.mp4", "it", "video_with_spaces_it.srt")
         ]
         
-        with patch('subtitles.pysrt') as mock_pysrt:
+        with patch('video_translator.subtitles.pysrt') as mock_pysrt:
             mock_subs = Mock()
             mock_pysrt.SubRipFile.return_value = mock_subs
             

@@ -11,8 +11,8 @@ class TestTranslator(unittest.TestCase):
             {'start': 5.0, 'end': 10.0, 'text': 'How are you?'}
         ]
     
-    @patch('translator.argostranslate.package')
-    @patch('translator.argostranslate.translate')
+    @patch('video_translator.translator.argostranslate.package')
+    @patch('video_translator.translator.argostranslate.translate')
     def test_translate_segments_success(self, mock_translate, mock_package):
         """Test successful translation"""
         # Mock translation
@@ -55,8 +55,8 @@ class TestTranslator(unittest.TestCase):
             
             self.assertIn("Argostranslate is not installed", str(context.exception))
     
-    @patch('translator.argostranslate.package')
-    @patch('translator.argostranslate.translate')
+    @patch('video_translator.translator.argostranslate.package')
+    @patch('video_translator.translator.argostranslate.translate')
     def test_translate_segments_translation_fails(self, mock_translate, mock_package):
         """Test error when translation fails"""
         mock_translate.translate.side_effect = Exception("Translation error")
@@ -66,8 +66,8 @@ class TestTranslator(unittest.TestCase):
         
         self.assertIn("Translation failed", str(context.exception))
     
-    @patch('translator.argostranslate.package')
-    @patch('translator.argostranslate.translate')
+    @patch('video_translator.translator.argostranslate.package')
+    @patch('video_translator.translator.argostranslate.translate')
     def test_translate_segments_debug_mode(self, mock_translate, mock_package):
         """Test translation with debug mode enabled"""
         mock_translate.translate.side_effect = ['Hola mundo', '¿Cómo estás?']

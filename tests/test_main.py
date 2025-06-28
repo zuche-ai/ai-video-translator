@@ -17,10 +17,10 @@ class TestMain(unittest.TestCase):
             '--output', 'output_video.mp4'
         ]
     
-    @patch('main.transcribe_video')
-    @patch('main.translate_segments')
-    @patch('main.generate_srt')
-    @patch('main.burn_subtitles')
+    @patch('video_translator.main.transcribe_video')
+    @patch('video_translator.main.translate_segments')
+    @patch('video_translator.main.generate_srt')
+    @patch('video_translator.main.burn_subtitles')
     def test_main_success(self, mock_burn, mock_generate, mock_translate, mock_transcribe):
         """Test successful main execution"""
         # Mock return values
@@ -52,7 +52,7 @@ class TestMain(unittest.TestCase):
         output = captured_output.getvalue()
         self.assertIn("✅ Done!", output)
     
-    @patch('main.transcribe_video')
+    @patch('video_translator.main.transcribe_video')
     def test_main_file_not_found(self, mock_transcribe):
         """Test main with file not found error"""
         mock_transcribe.side_effect = FileNotFoundError("Video file not found: test_video.mp4")
@@ -72,7 +72,7 @@ class TestMain(unittest.TestCase):
         output = captured_output.getvalue()
         self.assertIn("❌ File not found", output)
     
-    @patch('main.transcribe_video')
+    @patch('video_translator.main.transcribe_video')
     def test_main_missing_dependency(self, mock_transcribe):
         """Test main with missing dependency error"""
         mock_transcribe.side_effect = ImportError("Whisper is not installed")
@@ -93,7 +93,7 @@ class TestMain(unittest.TestCase):
         self.assertIn("❌ Missing dependency", output)
         self.assertIn("pip install -r requirements.txt", output)
     
-    @patch('main.transcribe_video')
+    @patch('video_translator.main.transcribe_video')
     def test_main_invalid_input(self, mock_transcribe):
         """Test main with invalid input error"""
         mock_transcribe.side_effect = ValueError("No segments provided")
@@ -113,7 +113,7 @@ class TestMain(unittest.TestCase):
         output = captured_output.getvalue()
         self.assertIn("❌ Invalid input", output)
     
-    @patch('main.transcribe_video')
+    @patch('video_translator.main.transcribe_video')
     def test_main_processing_fails(self, mock_transcribe):
         """Test main with processing failure"""
         mock_transcribe.side_effect = RuntimeError("Transcription failed")
@@ -133,7 +133,7 @@ class TestMain(unittest.TestCase):
         output = captured_output.getvalue()
         self.assertIn("❌ Processing failed", output)
     
-    @patch('main.transcribe_video')
+    @patch('video_translator.main.transcribe_video')
     def test_main_keyboard_interrupt(self, mock_transcribe):
         """Test main with keyboard interrupt"""
         mock_transcribe.side_effect = KeyboardInterrupt()
@@ -153,7 +153,7 @@ class TestMain(unittest.TestCase):
         output = captured_output.getvalue()
         self.assertIn("❌ Process interrupted by user", output)
     
-    @patch('main.transcribe_video')
+    @patch('video_translator.main.transcribe_video')
     def test_main_debug_mode(self, mock_transcribe):
         """Test main with debug mode enabled"""
         # Add debug flag to args
@@ -164,9 +164,9 @@ class TestMain(unittest.TestCase):
         mock_transcribe.return_value = mock_segments
         
         # Mock other functions to avoid calling them
-        with patch('main.translate_segments') as mock_translate, \
-             patch('main.generate_srt') as mock_generate, \
-             patch('main.burn_subtitles') as mock_burn:
+        with patch('video_translator.main.translate_segments') as mock_translate, \
+             patch('video_translator.main.generate_srt') as mock_generate, \
+             patch('video_translator.main.burn_subtitles') as mock_burn:
             
             mock_translate.return_value = mock_segments
             mock_generate.return_value = 'test.srt'

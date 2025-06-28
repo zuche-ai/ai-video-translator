@@ -1,5 +1,7 @@
 import whisper
 import os
+import warnings
+import torch
 from typing import List, Dict, Any
 
 def transcribe_video(video_path: str, language: str = "en", debug: bool = False) -> List[Dict[str, Any]]:
@@ -27,8 +29,17 @@ def transcribe_video(video_path: str, language: str = "en", debug: bool = False)
         if debug:
             print(f"[DEBUG] Loading Whisper model...")
         
-        # Load Whisper model
-        model = whisper.load_model("base")
+        # Detect if we're running on CPU and suppress FP16 warning
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        if device == "cpu":
+            # Suppress the FP16 warning on CPU since user can't do anything about it
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
+                model = whisper.load_model("base")
+        else:
+            # GPU available, load model normally
+            model = whisper.load_model("base")
         
         if debug:
             print(f"[DEBUG] Transcribing {video_path} in {language}...")
