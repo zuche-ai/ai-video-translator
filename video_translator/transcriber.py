@@ -36,16 +36,24 @@ def transcribe_video(video_path: str, language: str = "en", debug: bool = False)
             # Suppress the FP16 warning on CPU since user can't do anything about it
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
+                
+                # Load Whisper model
                 model = whisper.load_model("base")
+                
+                if debug:
+                    print(f"[DEBUG] Transcribing {video_path} in {language}...")
+                
+                # Transcribe the video (also within the warning suppression context)
+                result = model.transcribe(video_path, language=language)
         else:
             # GPU available, load model normally
             model = whisper.load_model("base")
-        
-        if debug:
-            print(f"[DEBUG] Transcribing {video_path} in {language}...")
-        
-        # Transcribe the video
-        result = model.transcribe(video_path, language=language)
+            
+            if debug:
+                print(f"[DEBUG] Transcribing {video_path} in {language}...")
+            
+            # Transcribe the video
+            result = model.transcribe(video_path, language=language)
         
         if debug:
             print(f"[DEBUG] Transcription completed. Found {len(result['segments'])} segments.")
