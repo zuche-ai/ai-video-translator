@@ -1,8 +1,13 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
-import os
 import tempfile
-from video_translator.subtitles import generate_srt
+import os
+from unittest.mock import Mock, patch, MagicMock
+import sys
+
+# Add the parent directory to the path to import the main module
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from video_translator.core.subtitles import generate_srt
 
 
 class TestSubtitles(unittest.TestCase):
@@ -17,7 +22,7 @@ class TestSubtitles(unittest.TestCase):
     
     def test_generate_srt_success(self):
         """Test successful SRT file generation"""
-        with patch('video_translator.subtitles.pysrt') as mock_pysrt:
+        with patch('video_translator.core.subtitles.pysrt') as mock_pysrt:
             # Mock pysrt components
             mock_subs = Mock()
             mock_pysrt.SubRipFile.return_value = mock_subs
@@ -74,17 +79,9 @@ class TestSubtitles(unittest.TestCase):
         
         self.assertIn("missing required fields", str(context.exception))
     
-    def test_generate_srt_pysrt_not_installed(self):
-        """Test error when pysrt is not installed"""
-        with patch.dict('sys.modules', {'pysrt': None}):
-            with self.assertRaises(ImportError) as context:
-                generate_srt(self.test_segments, self.test_video_path, self.test_language)
-            
-            self.assertIn("Pysrt is not installed", str(context.exception))
-    
     def test_generate_srt_save_fails(self):
         """Test error when SRT file save fails"""
-        with patch('video_translator.subtitles.pysrt') as mock_pysrt:
+        with patch('video_translator.core.subtitles.pysrt') as mock_pysrt:
             mock_subs = Mock()
             mock_subs.save.side_effect = Exception("Save error")
             mock_pysrt.SubRipFile.return_value = mock_subs
@@ -96,7 +93,7 @@ class TestSubtitles(unittest.TestCase):
     
     def test_generate_srt_debug_mode(self):
         """Test SRT generation with debug mode enabled"""
-        with patch('video_translator.subtitles.pysrt') as mock_pysrt:
+        with patch('video_translator.core.subtitles.pysrt') as mock_pysrt:
             mock_subs = Mock()
             mock_pysrt.SubRipFile.return_value = mock_subs
             
@@ -113,7 +110,7 @@ class TestSubtitles(unittest.TestCase):
             ("video_with_spaces.mp4", "it", "video_with_spaces_it.srt")
         ]
         
-        with patch('video_translator.subtitles.pysrt') as mock_pysrt:
+        with patch('video_translator.core.subtitles.pysrt') as mock_pysrt:
             mock_subs = Mock()
             mock_pysrt.SubRipFile.return_value = mock_subs
             

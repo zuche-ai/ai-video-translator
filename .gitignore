@@ -50,6 +50,8 @@ env/
 ENV/
 env.bak/
 venv.bak/
+venv_*/
+env_*/
 
 # IDE
 .vscode/
@@ -97,7 +99,12 @@ tmp/
 *.srt
 !test_*.srt
 
-# Output files
+# Output files and directories
 output/
 results/
-processed/ 
+processed/
+translated_*/
+cloned_audio_*/
+temp_audio_*/
+merged_audio_*/
+final_audio_*/ 
