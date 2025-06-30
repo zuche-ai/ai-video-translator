@@ -1,0 +1,5 @@
+#!/Users/iaingreer/Documents/video_translator/venv_xtts/bin/python3.11
+
+from argostranslate import argospm
+
+argospm.main()

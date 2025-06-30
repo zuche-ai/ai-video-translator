@@ -1,10 +1,15 @@
-from video_translator.transcriber import transcribe_video 
-
 import unittest
-from unittest.mock import Mock, patch, MagicMock
-import warnings
 import tempfile
 import os
+from unittest.mock import Mock, patch, MagicMock
+import sys
+
+# Add the parent directory to the path to import the main module
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from video_translator.core.transcriber import transcribe_video 
+
+import warnings
 
 
 class TestTranscriber(unittest.TestCase):
@@ -22,8 +27,8 @@ class TestTranscriber(unittest.TestCase):
             os.remove(self.test_video_path)
         os.rmdir(self.temp_dir)
     
-    @patch('video_translator.transcriber.whisper')
-    @patch('video_translator.transcriber.torch')
+    @patch('video_translator.core.transcriber.whisper')
+    @patch('video_translator.core.transcriber.torch')
     def test_transcribe_video_suppresses_fp16_warning_on_cpu(self, mock_torch, mock_whisper):
         """Test that FP16 warning is suppressed on CPU"""
         # Mock torch to simulate CPU environment
@@ -54,8 +59,8 @@ class TestTranscriber(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['text'], 'Hello world')
     
-    @patch('video_translator.transcriber.whisper')
-    @patch('video_translator.transcriber.torch')
+    @patch('video_translator.core.transcriber.whisper')
+    @patch('video_translator.core.transcriber.torch')
     def test_transcribe_video_success(self, mock_torch, mock_whisper):
         """Test successful transcription"""
         # Mock torch to simulate GPU environment
@@ -89,7 +94,7 @@ class TestTranscriber(unittest.TestCase):
         
         self.assertIn("Video file not found", str(context.exception))
     
-    @patch('video_translator.transcriber.whisper')
+    @patch('video_translator.core.transcriber.whisper')
     def test_transcribe_video_whisper_not_installed(self, mock_whisper):
         """Test error when whisper is not installed"""
         mock_whisper.load_model.side_effect = ImportError("No module named 'whisper'")
@@ -99,7 +104,7 @@ class TestTranscriber(unittest.TestCase):
         
         self.assertIn("Whisper is not installed", str(context.exception))
     
-    @patch('video_translator.transcriber.whisper')
+    @patch('video_translator.core.transcriber.whisper')
     def test_transcribe_video_transcription_fails(self, mock_whisper):
         """Test error when transcription fails"""
         mock_model = Mock()
@@ -111,7 +116,7 @@ class TestTranscriber(unittest.TestCase):
         
         self.assertIn("Transcription failed", str(context.exception))
     
-    @patch('video_translator.transcriber.whisper')
+    @patch('video_translator.core.transcriber.whisper')
     def test_transcribe_video_debug_mode(self, mock_whisper):
         """Test transcription with debug mode enabled"""
         mock_model = Mock()

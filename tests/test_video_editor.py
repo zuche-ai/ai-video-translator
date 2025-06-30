@@ -1,8 +1,13 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
-import os
 import tempfile
-from video_translator.video_editor import burn_subtitles
+import os
+from unittest.mock import Mock, patch, MagicMock
+import sys
+
+# Add the parent directory to the path to import the main module
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from video_translator.video.video_editor import burn_subtitles
 
 
 class TestVideoEditor(unittest.TestCase):
@@ -27,7 +32,7 @@ class TestVideoEditor(unittest.TestCase):
                 os.remove(file_path)
         os.rmdir(self.temp_dir)
     
-    @patch('video_translator.video_editor.ffmpeg')
+    @patch('video_translator.video.video_editor.ffmpeg')
     def test_burn_subtitles_success(self, mock_ffmpeg):
         """Test successful subtitle burning"""
         # Mock ffmpeg components
@@ -48,7 +53,7 @@ class TestVideoEditor(unittest.TestCase):
         # Verify ffmpeg calls
         mock_ffmpeg.input.assert_called_once_with(self.test_video_path)
         mock_input.video.filter.assert_called_once_with('subtitles', self.test_srt_path)
-        mock_ffmpeg.output.assert_called_once_with(mock_video, mock_audio, self.test_output_path, vcodec='libx264', acodec='copy')
+        mock_ffmpeg.output.assert_called_once_with(mock_video, mock_audio, self.test_output_path, vcodec='libx264', acodec='aac')
         mock_ffmpeg.run.assert_called_once_with(mock_stream, overwrite_output=True, quiet=True)
     
     def test_burn_subtitles_video_file_not_found(self):
@@ -65,7 +70,7 @@ class TestVideoEditor(unittest.TestCase):
         
         self.assertIn("SRT file not found", str(context.exception))
     
-    @patch('video_translator.video_editor.ffmpeg')
+    @patch('video_translator.video.video_editor.ffmpeg')
     def test_burn_subtitles_ffmpeg_not_installed(self, mock_ffmpeg):
         """Test error when ffmpeg-python is not installed"""
         mock_ffmpeg.input.side_effect = ImportError("No module named 'ffmpeg'")
@@ -75,7 +80,7 @@ class TestVideoEditor(unittest.TestCase):
         
         self.assertIn("Ffmpeg-python is not installed", str(context.exception))
     
-    @patch('video_translator.video_editor.ffmpeg')
+    @patch('video_translator.video.video_editor.ffmpeg')
     def test_burn_subtitles_processing_fails(self, mock_ffmpeg):
         """Test error when video processing fails"""
         # Mock ffmpeg components
@@ -96,7 +101,7 @@ class TestVideoEditor(unittest.TestCase):
         
         self.assertIn("Video processing failed", str(context.exception))
     
-    @patch('video_translator.video_editor.ffmpeg')
+    @patch('video_translator.video.video_editor.ffmpeg')
     def test_burn_subtitles_debug_mode(self, mock_ffmpeg):
         """Test subtitle burning with debug mode enabled"""
         # Mock ffmpeg components

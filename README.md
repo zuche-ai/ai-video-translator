@@ -68,7 +68,7 @@ python -m video_translator.main --input video.mp4 --src-lang en --tgt-lang es --
 - `--voice-clone`: Enable voice cloning with translated audio
 - `--audio-mode`: Audio processing mode (`replace`, `overlay`, `subtitles-only`)
 - `--original-volume`: Volume of original audio when overlaying (0.0 to 1.0, default: 0.3)
-- `--voice-profile-duration`: Duration of audio to use for voice profiling in seconds (default: 10.0)
+- `--reference-audio`: Path to reference audio file for voice cloning (optional)
 - `--debug`: Enable debug output (optional)
 
 ### Audio Modes
@@ -159,19 +159,19 @@ python -m unittest tests.test_translator
 python -m unittest tests.test_subtitles
 python -m unittest tests.test_video_editor
 python -m unittest tests.test_voice_cloner
-python -m unittest tests.test_main
+python -m unittest tests.test_main_audio_sync
+python -m unittest tests.test_audio_sync
 ```
 
 ### Test Coverage
 
 The test suite covers:
 
-- **Transcriber Module**: Audio transcription functionality
-- **Translator Module**: Text translation capabilities
-- **Subtitles Module**: SRT file generation
-- **Video Editor Module**: Subtitle burning and video processing
-- **Voice Cloner Module**: Voice cloning and audio processing
+- **Core Modules**: Audio transcription, translation, and subtitle generation (`video_translator/core/`)
+- **Audio Modules**: Voice cloning and audio processing (`video_translator/audio/`)
+- **Video Modules**: Subtitle burning and video processing (`video_translator/video/`)
 - **Main Module**: Command-line interface and error handling
+- **Audio Synchronization**: Timeline and overlay logic for translated audio
 
 Each module includes tests for:
 - ✅ Successful operations
@@ -185,12 +185,18 @@ Each module includes tests for:
 video_translator/
 ├── video_translator/
 │   ├── __init__.py
-│   ├── main.py              # Main application entry point
-│   ├── transcriber.py       # Audio transcription using Whisper
-│   ├── translator.py        # Text translation using ArgosTranslate
-│   ├── subtitles.py         # SRT subtitle file generation
-│   ├── video_editor.py      # Video processing with FFmpeg
-│   └── voice_cloner.py      # Voice cloning using Coqui TTS
+│   ├── main.py                # Main application entry point
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── transcriber.py     # Audio transcription using Whisper
+│   │   ├── translator.py     # Text translation using ArgosTranslate
+│   │   └── subtitles.py      # SRT subtitle file generation
+│   ├── audio/
+│   │   ├── __init__.py
+│   │   └── voice_cloner.py   # Voice cloning using Coqui TTS
+│   └── video/
+│       ├── __init__.py
+│       └── video_editor.py   # Video processing with FFmpeg
 ├── tests/
 │   ├── __init__.py
 │   ├── test_transcriber.py
@@ -198,12 +204,14 @@ video_translator/
 │   ├── test_subtitles.py
 │   ├── test_video_editor.py
 │   ├── test_voice_cloner.py
-│   └── test_main.py
-├── requirements.txt         # Python dependencies
-├── run_tests.py            # Test runner
-├── .gitignore              # Git ignore rules
-├── SECURITY.md             # Security best practices
-└── README.md               # This file
+│   ├── test_main.py
+│   ├── test_main_audio_sync.py
+│   └── test_audio_sync.py
+├── requirements.txt           # Python dependencies
+├── run_tests.py               # Test runner
+├── .gitignore                 # Git ignore rules
+├── SECURITY.md                # Security best practices
+└── README.md                  # This file
 ```
 
 ## Dependencies
@@ -219,6 +227,7 @@ video_translator/
 - **numpy**: Numerical computing
 - **librosa**: Audio analysis
 - **soundfile**: Audio file I/O
+- **webrtcvad**: Voice activity detection (for reference audio quality)
 
 ## Performance Considerations
 
