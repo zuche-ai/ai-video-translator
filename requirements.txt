@@ -9,3 +9,4 @@ torchaudio
 numpy
 librosa
 soundfile
+flask-cors
