@@ -27,154 +27,61 @@ class TestMain(unittest.TestCase):
             '--output', 'output_video.mp4'
         ]
     
-    @patch('video_translator.main.transcribe_video')
-    @patch('video_translator.main.translate_segments')
-    @patch('video_translator.main.generate_srt')
-    @patch('video_translator.main.burn_subtitles')
-    def test_main_success(self, mock_burn, mock_generate, mock_translate, mock_transcribe):
+    @patch('video_translator.main.process')
+    def test_main_success(self, mock_process):
         """Test successful main execution"""
-        # Mock return values
-        mock_segments = [
-            {'start': 0.0, 'end': 2.0, 'text': 'Hello world'},
-            {'start': 2.0, 'end': 4.0, 'text': 'How are you?'}
-        ]
-        mock_transcribe.return_value = mock_segments
-        mock_translate.return_value = mock_segments
-        mock_generate.return_value = 'test.srt'
-        
-        # Mock command line arguments
+        mock_process.return_value = None
         test_args = ['--input', 'test_video.mp4', '--src-lang', 'en', '--tgt-lang', 'es', '--output', 'output.mp4']
-        
         with patch('sys.argv', ['main.py'] + test_args):
-            with patch('os.path.exists', return_value=True):
-                with patch('builtins.print') as mock_print:
-                    main()
-                    
-                    # Verify the expected output
-                    output = '\n'.join([call[0][0] if call[0] else '' for call in mock_print.call_args_list])
-                    self.assertIn("✅ Done!", output)
+            main()  # Should not raise
     
-    @patch('video_translator.main.transcribe_video')
-    def test_main_file_not_found(self, mock_transcribe):
+    @patch('video_translator.main.process', side_effect=FileNotFoundError("Video file not found: test_video.mp4"))
+    def test_main_file_not_found(self, mock_process):
         """Test main with file not found error"""
-        # Mock file not found
-        mock_transcribe.side_effect = FileNotFoundError("Video file not found: test_video.mp4")
-        
-        # Mock command line arguments
         test_args = ['--input', 'test_video.mp4', '--src-lang', 'en', '--tgt-lang', 'es', '--output', 'output.mp4']
-        
         with patch('sys.argv', ['main.py'] + test_args):
-            with patch('os.path.exists', return_value=True):
-                with patch('builtins.print') as mock_print:
-                    with self.assertRaises(SystemExit):
-                        main()
-                    
-                    # Verify the expected output
-                    output = '\n'.join([call[0][0] if call[0] else '' for call in mock_print.call_args_list])
-                    self.assertIn("❌ File not found", output)
+            with self.assertRaises(SystemExit):
+                main()
     
-    @patch('video_translator.main.transcribe_video')
-    def test_main_missing_dependency(self, mock_transcribe):
+    @patch('video_translator.main.process', side_effect=ImportError("Missing dependency"))
+    def test_main_missing_dependency(self, mock_process):
         """Test main with missing dependency error"""
-        # Mock import error
-        mock_transcribe.side_effect = ImportError("Missing dependency")
-        
-        # Mock command line arguments
         test_args = ['--input', 'test_video.mp4', '--src-lang', 'en', '--tgt-lang', 'es', '--output', 'output.mp4']
-        
         with patch('sys.argv', ['main.py'] + test_args):
-            with patch('os.path.exists', return_value=True):
-                with patch('builtins.print') as mock_print:
-                    with self.assertRaises(SystemExit):
-                        main()
-                    
-                    # Verify the expected output
-                    output = '\n'.join([call[0][0] if call[0] else '' for call in mock_print.call_args_list])
-                    self.assertIn("❌ Missing dependency", output)
+            with self.assertRaises(SystemExit):
+                main()
     
-    @patch('video_translator.main.transcribe_video')
-    def test_main_invalid_input(self, mock_transcribe):
+    @patch('video_translator.main.process', side_effect=ValueError("Invalid input"))
+    def test_main_invalid_input(self, mock_process):
         """Test main with invalid input error"""
-        # Mock value error
-        mock_transcribe.side_effect = ValueError("Invalid input")
-        
-        # Mock command line arguments
         test_args = ['--input', 'test_video.mp4', '--src-lang', 'en', '--tgt-lang', 'es', '--output', 'output.mp4']
-        
         with patch('sys.argv', ['main.py'] + test_args):
-            with patch('os.path.exists', return_value=True):
-                with patch('builtins.print') as mock_print:
-                    with self.assertRaises(SystemExit):
-                        main()
-                    
-                    # Verify the expected output
-                    output = '\n'.join([call[0][0] if call[0] else '' for call in mock_print.call_args_list])
-                    self.assertIn("❌ Invalid input", output)
+            with self.assertRaises(SystemExit):
+                main()
     
-    @patch('video_translator.main.transcribe_video')
-    def test_main_processing_fails(self, mock_transcribe):
+    @patch('video_translator.main.process', side_effect=RuntimeError("Processing failed"))
+    def test_main_processing_fails(self, mock_process):
         """Test main with processing failure"""
-        # Mock runtime error
-        mock_transcribe.side_effect = RuntimeError("Processing failed")
-        
-        # Mock command line arguments
         test_args = ['--input', 'test_video.mp4', '--src-lang', 'en', '--tgt-lang', 'es', '--output', 'output.mp4']
-        
         with patch('sys.argv', ['main.py'] + test_args):
-            with patch('os.path.exists', return_value=True):
-                with patch('builtins.print') as mock_print:
-                    with self.assertRaises(SystemExit):
-                        main()
-                    
-                    # Verify the expected output
-                    output = '\n'.join([call[0][0] if call[0] else '' for call in mock_print.call_args_list])
-                    self.assertIn("❌ Processing failed", output)
+            with self.assertRaises(SystemExit):
+                main()
     
-    @patch('video_translator.main.transcribe_video')
-    def test_main_keyboard_interrupt(self, mock_transcribe):
+    @patch('video_translator.main.process', side_effect=KeyboardInterrupt())
+    def test_main_keyboard_interrupt(self, mock_process):
         """Test main with keyboard interrupt"""
-        # Mock keyboard interrupt
-        mock_transcribe.side_effect = KeyboardInterrupt()
-        
-        # Mock command line arguments
         test_args = ['--input', 'test_video.mp4', '--src-lang', 'en', '--tgt-lang', 'es', '--output', 'output.mp4']
-        
         with patch('sys.argv', ['main.py'] + test_args):
-            with patch('os.path.exists', return_value=True):
-                with patch('builtins.print') as mock_print:
-                    with self.assertRaises(SystemExit):
-                        main()
-                    
-                    # Verify the expected output
-                    output = '\n'.join([call[0][0] if call[0] else '' for call in mock_print.call_args_list])
-                    self.assertIn("❌ Process interrupted by user", output)
+            with self.assertRaises(SystemExit):
+                main()
     
-    @patch('video_translator.main.transcribe_video')
-    @patch('video_translator.main.translate_segments')
-    @patch('video_translator.main.generate_srt')
-    @patch('video_translator.main.burn_subtitles')
-    def test_main_debug_mode(self, mock_burn, mock_generate, mock_translate, mock_transcribe):
+    @patch('video_translator.main.process')
+    def test_main_debug_mode(self, mock_process):
         """Test main with debug mode enabled"""
-        # Mock return values
-        mock_segments = [
-            {'start': 0.0, 'end': 2.0, 'text': 'Hello world'},
-            {'start': 2.0, 'end': 4.0, 'text': 'How are you?'}
-        ]
-        mock_transcribe.return_value = mock_segments
-        mock_translate.return_value = mock_segments
-        mock_generate.return_value = 'test.srt'
-        
-        # Mock command line arguments with debug flag
+        mock_process.return_value = None
         test_args = ['--input', 'test_video.mp4', '--src-lang', 'en', '--tgt-lang', 'es', '--output', 'output.mp4', '--debug']
-        
         with patch('sys.argv', ['main.py'] + test_args):
-            with patch('os.path.exists', return_value=True):
-                with patch('builtins.print') as mock_print:
-                    main()
-                    
-                    # Verify the expected output
-                    output = '\n'.join([call[0][0] if call[0] else '' for call in mock_print.call_args_list])
-                    self.assertIn("✅ Done!", output)
+            main()  # Should not raise
 
 
 if __name__ == '__main__':

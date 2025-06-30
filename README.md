@@ -2,6 +2,8 @@
 
 A Python application that transcribes, translates, and adds subtitles to videos using AI-powered tools. Now with **voice cloning** capabilities!
 
+**Now with a modern local Web UI!** Use either the command-line interface (CLI) or the drag-and-drop React frontend for batch video translation, voice cloning, and subtitles—all running locally.
+
 ## Features
 
 - **Audio Transcription**: Uses OpenAI Whisper for accurate speech-to-text conversion
@@ -12,6 +14,7 @@ A Python application that transcribes, translates, and adds subtitles to videos 
 - **Video Processing**: Burns subtitles into videos with custom audio options
 - **Error Handling**: Comprehensive error handling with helpful error messages
 - **Unit Tests**: Full test coverage for all modules
+- **Modern Web UI**: Drag-and-drop React frontend for batch video upload, options, and progress tracking (optional)
 
 ## Installation
 
@@ -39,6 +42,57 @@ A Python application that transcribes, translates, and adds subtitles to videos 
    ```
 
 ## Usage
+
+You can use **either the command-line interface (CLI)** (see below), **or the local Web UI** (see next section) for video translation and voice cloning.
+
+### Web UI (React Frontend)
+
+The Web UI provides a modern, local interface for batch video upload, drag-and-drop, and real-time progress tracking. All processing happens locally—no data leaves your machine.
+
+#### 1. Install frontend dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+#### 2. Start the frontend (React/Vite)
+
+```bash
+npm run dev
+```
+
+- The UI will be available at [http://localhost:5173](http://localhost:5173)
+- Make sure the backend (Flask API) is running (see below)
+
+#### 3. Start the backend (Flask API)
+
+In a separate terminal:
+
+```bash
+python -m video_translator.api
+```
+
+- The backend will run at [http://localhost:5001](http://localhost:5001)
+
+#### 4. Using the UI
+
+- Drag and drop video files or use the file picker
+- Select source/target language, audio mode, and options
+- Click **Start Processing**
+- Progress bars and download links will appear for each video
+- Supports batch processing, voice cloning, overlay, and captions
+
+#### Features of the Web UI
+- Drag-and-drop or batch file selection
+- All CLI options available as dropdowns/toggles
+- Real-time progress bars for each video
+- Download links for processed videos
+- Local-only: No uploads to any server
+
+---
+
+### Command-Line Usage (CLI)
 
 ### Basic Usage (Subtitles Only)
 
