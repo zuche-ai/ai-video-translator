@@ -59,6 +59,18 @@ python -m video_translator.main --input video.mp4 --src-lang en --tgt-lang es --
 python -m video_translator.main --input video.mp4 --src-lang en --tgt-lang es --output translated_video.mp4 --audio-mode subtitles-only
 ```
 
+### New Features
+
+- `--add-captions`: Burn subtitles even when using overlay or replace audio modes (captions + voice overlay together)
+- `--caption-font-size`: Set the font size for subtitles (default: 24, smaller and less intrusive)
+
+### Usage Example (Overlay + Captions, Small Font)
+
+```bash
+python -m video_translator.main --input video.mp4 --src-lang en --tgt-lang es --output translated_video.mp4 \
+  --voice-clone --audio-mode overlay --add-captions --caption-font-size 24
+```
+
 ### Parameters
 
 - `--input`: Path to the input video file
@@ -70,6 +82,8 @@ python -m video_translator.main --input video.mp4 --src-lang en --tgt-lang es --
 - `--original-volume`: Volume of original audio when overlaying (0.0 to 1.0, default: 0.3)
 - `--reference-audio`: Path to reference audio file for voice cloning (optional)
 - `--debug`: Enable debug output (optional)
+- `--add-captions`: Burn subtitles even when using overlay or replace audio modes
+- `--caption-font-size`: Font size for subtitles (default: 24)
 
 ### Audio Modes
 
@@ -248,3 +262,7 @@ video_translator/
 ## License
 
 This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+
+### Sync Guarantee
+
+- **Captions and voice overlay are always in sync**: Both use the same timestamped segments from the transcription and translation pipeline, so the displayed text matches the spoken audio.

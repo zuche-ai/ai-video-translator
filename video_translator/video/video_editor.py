@@ -3,15 +3,16 @@ import os
 from typing import Optional
 
 def burn_subtitles(video_path: str, srt_path: Optional[str], output_path: str, 
-                  audio_file: Optional[str] = None, debug: bool = False) -> None:
+                  audio_file: Optional[str] = None, caption_font_size: int = 24, debug: bool = False) -> None:
     """
-    Burn subtitles into video using ffmpeg, with optional custom audio.
+    Burn subtitles into video using ffmpeg, with optional custom audio and font size.
     
     Args:
         video_path: Path to the input video file
         srt_path: Path to the SRT subtitle file (None for no subtitles)
         output_path: Path for the output video file
         audio_file: Optional path to custom audio file (if None, uses original audio)
+        caption_font_size: Font size for subtitles (default: 24)
         debug: Enable debug output
         
     Raises:
@@ -43,8 +44,9 @@ def burn_subtitles(video_path: str, srt_path: Optional[str], output_path: str,
         
         # Video processing
         if srt_path:
-            # Add subtitles
-            video = input_stream.video.filter('subtitles', srt_path)
+            # Add subtitles with custom font size
+            force_style = f"Fontsize={caption_font_size}"
+            video = input_stream.video.filter('subtitles', srt_path, force_style=force_style)
         else:
             # No subtitles, use original video
             video = input_stream.video
