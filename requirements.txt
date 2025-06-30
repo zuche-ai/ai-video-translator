@@ -3,3 +3,9 @@ argostranslate
 ffmpeg-python
 pysrt
 tqdm
+TTS
+torch
+torchaudio
+numpy
+librosa
+soundfile
