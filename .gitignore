@@ -50,6 +50,8 @@ env/
 ENV/
 env.bak/
 venv.bak/
+venv_*/
+env_*/
 
 # IDE
 .vscode/
