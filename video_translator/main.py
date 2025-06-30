@@ -27,6 +27,8 @@ def main():
     parser.add_argument('--reference-audio', type=str, 
                        help='Path to reference audio file for voice cloning (if not provided, will extract from video)')
     parser.add_argument('--debug', action='store_true', help='Print all commands and actions')
+    parser.add_argument('--add-captions', action='store_true', help='Burn subtitles even when using overlay or replace audio modes')
+    parser.add_argument('--caption-font-size', type=int, default=24, help='Font size for subtitles (default: 24)')
     args = parser.parse_args()
 
     try:
@@ -63,7 +65,7 @@ def main():
                 args.voice_clone = False
                 # Continue with subtitles-only mode
                 srt_path = generate_srt(translated_segments, args.input, args.tgt_lang, debug=args.debug)
-                burn_subtitles(args.input, srt_path, args.output, debug=args.debug)
+                burn_subtitles(args.input, srt_path, args.output, caption_font_size=args.caption_font_size, debug=args.debug)
                 print(f"\n✅ Done! Output saved to {args.output}")
                 print(f"📝 Subtitles added in {args.tgt_lang} (voice cloning failed)")
                 return
@@ -143,7 +145,7 @@ def main():
                 args.voice_clone = False
                 # Continue with subtitles-only mode
                 srt_path = generate_srt(translated_segments, args.input, args.tgt_lang, debug=args.debug)
-                burn_subtitles(args.input, srt_path, args.output, debug=args.debug)
+                burn_subtitles(args.input, srt_path, args.output, caption_font_size=args.caption_font_size, debug=args.debug)
                 print(f"\n✅ Done! Output saved to {args.output}")
                 print(f"📝 Subtitles added in {args.tgt_lang} (voice cloning failed)")
                 return
@@ -197,9 +199,12 @@ def main():
                 final_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
                 sf.write(final_audio, mixed_audio, sr)
             
-            print(f"[4/5] Creating video with cloned audio (no captions)...")
-            # Create video with cloned audio but no captions
-            burn_subtitles(args.input, None, args.output, audio_file=final_audio, debug=args.debug)
+            print(f"[4/5] Creating video with cloned audio (captions: {'on' if args.add_captions else 'off'})...")
+            # Optionally generate SRT for overlay/replace modes
+            srt_path = None
+            if args.add_captions:
+                srt_path = generate_srt(translated_segments, args.input, args.tgt_lang, debug=args.debug)
+            burn_subtitles(args.input, srt_path, args.output, audio_file=final_audio, caption_font_size=args.caption_font_size, debug=args.debug)
             
             # Clean up temporary files
             if 'temp_audio' in locals():
@@ -219,7 +224,7 @@ def main():
             srt_path = generate_srt(translated_segments, args.input, args.tgt_lang, debug=args.debug)
             
             print(f"[4/5] Burning subtitles into video...")
-            burn_subtitles(args.input, srt_path, args.output, debug=args.debug)
+            burn_subtitles(args.input, srt_path, args.output, caption_font_size=args.caption_font_size, debug=args.debug)
 
         print(f"\n✅ Done! Output saved to {args.output}")
         
