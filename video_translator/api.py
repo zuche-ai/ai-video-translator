@@ -110,5 +110,9 @@ def result(job_id):
         return jsonify({'error': 'Result not available'}), 404
     return send_file(job['result_path'], as_attachment=True)
 
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'healthy', 'jobs': len(jobs)})
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5001) 
+    app.run(debug=True, host='0.0.0.0', port=5001) 

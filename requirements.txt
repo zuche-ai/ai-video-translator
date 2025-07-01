@@ -10,3 +10,4 @@ numpy
 librosa
 soundfile
 flask-cors
+webrtcvad

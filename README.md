@@ -18,6 +18,8 @@ A Python application that transcribes, translates, and adds subtitles to videos 
 
 ## Installation
 
+### Option 1: Manual Installation
+
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/zuche-ai/ai-video-translator.git
@@ -40,6 +42,32 @@ A Python application that transcribes, translates, and adds subtitles to videos 
    # Windows
    # Download from https://ffmpeg.org/download.html
    ```
+
+### Option 2: Docker (Recommended)
+
+For easy deployment and consistent environments, use Docker:
+
+1. **Install Docker Desktop** (if not already installed)
+2. **Clone the repository:**
+   ```bash
+   git clone https://github.com/zuche-ai/ai-video-translator.git
+   cd ai-video-translator
+   ```
+
+3. **Start with Docker:**
+   ```bash
+   # Using the helper script
+   ./docker-run.sh
+   
+   # Or manually
+   docker-compose up --build -d
+   ```
+
+4. **Access the application:**
+   - Frontend UI: http://localhost:3000
+   - Backend API: http://localhost:5001
+
+See [DOCKER.md](DOCKER.md) for detailed Docker documentation.
 
 ## Usage
 
