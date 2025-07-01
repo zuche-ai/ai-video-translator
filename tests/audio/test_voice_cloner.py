@@ -46,7 +46,8 @@ class TestVoiceCloner(unittest.TestCase):
         
         mock_tts_class.assert_called_once_with(
             model_name='tts_models/multilingual/multi-dataset/xtts_v2',
-            progress_bar=False
+            progress_bar=False,
+            gpu=False
         )
         self.assertEqual(cloner.tts, mock_tts_instance)
     
@@ -61,7 +62,8 @@ class TestVoiceCloner(unittest.TestCase):
         
         mock_tts_class.assert_called_once_with(
             model_name=custom_model,
-            progress_bar=False
+            progress_bar=False,
+            gpu=False
         )
     
     @patch('video_translator.audio.voice_cloner.TTS')
@@ -108,8 +110,8 @@ class TestVoiceCloner(unittest.TestCase):
         output_path = os.path.join(self.temp_dir, "output.wav")
         
         result = cloner.clone_voice(
-            reference_audio_path=reference_audio,
             text="Hello world",
+            audio_path=reference_audio,
             output_path=output_path,
             language="en"
         )
@@ -128,8 +130,8 @@ class TestVoiceCloner(unittest.TestCase):
         
         with self.assertRaises(RuntimeError):
             cloner.clone_voice(
-                reference_audio_path=self.test_audio_path,
                 text="Test",
+                audio_path=self.test_audio_path,
                 output_path="output.wav"
             )
     

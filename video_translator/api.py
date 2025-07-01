@@ -14,8 +14,9 @@ from video_translator.main import process
 app = Flask(__name__)
 CORS(app)
 
-# In-memory job store: {job_id: {status, progress, result_path, error}}
+# In-memory job store: {job_id: {status, progress, result_path, error, cancel_flag}}
 jobs = {}
+job_threads = {}
 
 UPLOAD_DIR = tempfile.gettempdir()
 RESULTS_DIR = tempfile.gettempdir()
@@ -44,6 +45,8 @@ def run_pipeline(job_id, input_path, options):
         
         jobs[job_id]['status'] = 'processing'
         jobs[job_id]['progress'] = 0
+        jobs[job_id]['status_message'] = 'Starting...'
+        jobs[job_id]['cancel_flag'] = False
         print(f"[API] Job status set to processing, progress 0")
         
         # Prepare output path with descriptive name
@@ -56,20 +59,15 @@ def run_pipeline(job_id, input_path, options):
         print(f"[API] Output path: {output_path}")
         
         # Step-based progress updates
-        def progress_hook(step):
-            print(f"[API] Progress hook called with step {step}")
-            if step == 1:
-                jobs[job_id]['progress'] = 20
-                print(f"[API] Progress set to 20%")
-            elif step == 2:
-                jobs[job_id]['progress'] = 40
-                print(f"[API] Progress set to 40%")
-            elif step == 3:
-                jobs[job_id]['progress'] = 60
-                print(f"[API] Progress set to 60%")
-            elif step == 4:
-                jobs[job_id]['progress'] = 80
-                print(f"[API] Progress set to 80%")
+        def progress_hook(step, percent, status_message=None):
+            if jobs[job_id].get('cancel_flag'):
+                print(f"[API] Job {job_id} cancelled, aborting progress updates.")
+                raise Exception('Job cancelled by user')
+            print(f"[API] Progress hook called with step {step}, percent {percent}, status '{status_message}'")
+            jobs[job_id]['progress'] = percent
+            if status_message is not None:
+                jobs[job_id]['status_message'] = status_message
+            print(f"[API] Progress set to {percent}%, status_message: {jobs[job_id].get('status_message')}")
         
         print(f"[API] About to call process function...")
         # Call the main process pipeline, injecting progress updates at key steps
@@ -92,11 +90,17 @@ def run_pipeline(job_id, input_path, options):
         jobs[job_id]['result_path'] = output_path
         print(f"[API] Job completed successfully")
     except Exception as e:
-        print(f"[API] Error in pipeline: {e}")
-        print(f"[API] Traceback: {traceback.format_exc()}")
-        jobs[job_id]['status'] = 'error'
-        jobs[job_id]['error'] = str(e)
-        jobs[job_id]['traceback'] = traceback.format_exc()
+        if str(e) == 'Job cancelled by user':
+            jobs[job_id]['status'] = 'cancelled'
+            jobs[job_id]['status_message'] = 'Cancelled by user'
+            jobs[job_id]['error'] = 'Job cancelled by user'
+            print(f"[API] Job {job_id} cancelled by user.")
+        else:
+            print(f"[API] Error in pipeline: {e}")
+            print(f"[API] Traceback: {traceback.format_exc()}")
+            jobs[job_id]['status'] = 'error'
+            jobs[job_id]['error'] = str(e)
+            jobs[job_id]['traceback'] = traceback.format_exc()
     finally:
         print(f"[API] ===== THREAD ENDING FOR JOB {job_id} =====")
 
@@ -138,6 +142,7 @@ def process_route():
     print(f"[API] Thread is alive before start: {thread.is_alive()}")
     print(f"[API] Thread created, starting...")
     thread.start()
+    job_threads[job_id] = thread
     print(f"[API] Thread started successfully")
     print(f"[API] Thread is alive after start: {thread.is_alive()}")
     print(f"[API] Thread name: {thread.name}")
@@ -160,6 +165,18 @@ def result(job_id):
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'healthy', 'jobs': len(jobs)})
+
+@app.route('/cancel/<job_id>', methods=['POST'])
+def cancel_job(job_id):
+    job = jobs.get(job_id)
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+    if job['status'] in ['done', 'error', 'cancelled']:
+        return jsonify({'error': f'Job already {job["status"]}'}), 400
+    job['cancel_flag'] = True
+    job['status'] = 'cancelling'
+    job['status_message'] = 'Cancelling...'
+    return jsonify({'message': 'Cancellation requested'})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001) 

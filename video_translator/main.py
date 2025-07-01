@@ -23,9 +23,14 @@ def process(input_path, output_path, src_lang, tgt_lang, voice_clone, audio_mode
         print(f"[MAIN] Voice clone: {voice_clone}")
         print(f"[MAIN] Audio mode: {audio_mode}")
         
+        # --- Granular Progress: 0-10% ---
+        if progress_hook:
+            progress_hook(1, 0, "Transcribing audio (loading model)")
         print(f"[1/5] Transcribing audio with Whisper...")
         print(f"[MAIN] About to call transcribe_video...")
         segments = transcribe_video(input_path, src_lang, debug=debug, timeout=600)  # 10 minute timeout
+        if progress_hook:
+            progress_hook(1, 10, "Transcribing audio (running inference)")
         print(f"[MAIN] transcribe_video completed successfully")
         
         # Check if transcription found any speech
@@ -39,27 +44,31 @@ def process(input_path, output_path, src_lang, tgt_lang, voice_clone, audio_mode
             }], input_path, tgt_lang, debug=debug)
             burn_subtitles(input_path, srt_path, output_path, caption_font_size=caption_font_size, debug=debug)
             if progress_hook:
-                progress_hook(3)
-            if progress_hook:
-                progress_hook(4)
+                progress_hook(4, 90, "Finalizing (burning subtitles)")
+                progress_hook(5, 100, "Done")
             return
         
+        # --- Granular Progress: 10-40% (Translation) ---
         if progress_hook:
-            progress_hook(1)
-
+            progress_hook(2, 10, f"Translating {len(segments)} segments")
         print(f"[2/5] Translating transcription to {tgt_lang}...")
-        translated_segments = translate_segments(segments, src_lang, tgt_lang, debug=debug)
-        if progress_hook:
-            progress_hook(2)
-
+        translated_segments = []
+        total_segments = len(segments)
+        for i, segment in enumerate(segments):
+            translated = translate_segments([segment], src_lang, tgt_lang, debug=debug)
+            translated_segments.extend(translated)
+            if progress_hook:
+                percent = 10 + int(((i+1)/total_segments)*30)
+                progress_hook(2, percent, f"Translating segment {i+1}/{total_segments}")
+        
         # Clear memory after transcription and translation
         import gc
         gc.collect()
         if hasattr(torch, 'cuda') and torch.cuda.is_available():
             torch.cuda.empty_cache()
         time.sleep(1)
-
-        # Voice cloning and audio processing
+        
+        # --- Granular Progress: 40-80% (Voice cloning/audio) ---
         if voice_clone and audio_mode != 'subtitles-only':
             print(f"[3/5] Processing voice cloning and audio...")
             try:
@@ -100,12 +109,19 @@ def process(input_path, output_path, src_lang, tgt_lang, voice_clone, audio_mode
                 temp_audio_dir = tempfile.mkdtemp()
                 texts = [seg['text'] for seg in translated_segments]
                 timestamps = [(seg['start'], seg['end']) for seg in translated_segments]
-                audio_files = voice_cloner.batch_clone_voice(
-                    reference_audio_path=reference_audio,
-                    texts=texts,
-                    output_dir=temp_audio_dir,
-                    language=tgt_lang
-                )
+                audio_files = []
+                total_audio = len(texts)
+                for i, text in enumerate(texts):
+                    audio_file = voice_cloner.clone_voice(
+                        text=text,
+                        audio_path=reference_audio,
+                        output_path=os.path.join(temp_audio_dir, f"cloned_audio_{i:04d}.wav"),
+                        language=tgt_lang
+                    )
+                    audio_files.append(audio_file)
+                    if progress_hook:
+                        percent = 40 + int(((i+1)/total_audio)*40)
+                        progress_hook(3, percent, f"Voice cloning segment {i+1}/{total_audio}")
                 import librosa
                 import soundfile as sf
                 original_audio, sr = librosa.load(reference_audio, sr=22050)
@@ -134,9 +150,8 @@ def process(input_path, output_path, src_lang, tgt_lang, voice_clone, audio_mode
                     srt_path = generate_srt(translated_segments, input_path, tgt_lang, debug=debug)
                 burn_subtitles(input_path, srt_path, output_path, audio_file=final_audio, caption_font_size=caption_font_size, debug=debug)
                 if progress_hook:
-                    progress_hook(3)
-                if progress_hook:
-                    progress_hook(4)
+                    progress_hook(4, 90, "Finalizing (burning subtitles)")
+                    progress_hook(5, 100, "Done")
                 # Clean up temp files
                 if os.path.exists(merged_audio):
                     os.unlink(merged_audio)
@@ -154,11 +169,11 @@ def process(input_path, output_path, src_lang, tgt_lang, voice_clone, audio_mode
         print(f"[3/5] Generating SRT subtitles...")
         srt_path = generate_srt(translated_segments, input_path, tgt_lang, debug=debug)
         if progress_hook:
-            progress_hook(3)
+            progress_hook(4, 90, "Finalizing (burning subtitles)")
         print(f"[4/5] Burning subtitles into video...")
         burn_subtitles(input_path, srt_path, output_path, caption_font_size=caption_font_size, debug=debug)
         if progress_hook:
-            progress_hook(4)
+            progress_hook(5, 100, "Done")
     except Exception as e:
         print(f"❌ Processing failed: {e}")
         import traceback
