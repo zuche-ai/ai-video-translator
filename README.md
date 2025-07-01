@@ -94,6 +94,28 @@ For production deployment with enhanced security and performance:
 See [DOCKER.md](DOCKER.md) for detailed Docker documentation.
 See [docker/PRODUCTION.md](docker/PRODUCTION.md) for production deployment guide.
 
+## Model Download Required
+
+Before running the Docker containers, you must download the required XTTS models locally:
+
+```sh
+python download_xtts.py
+```
+
+This will populate the `models/` directory with the required files.
+
+When running Docker, mount the local models directory into the container:
+
+```sh
+docker-compose up -d
+```
+
+or, if running manually:
+
+```sh
+docker run -v $(pwd)/models:/app/models/xtts ...
+```
+
 ## Usage
 
 You can use **either the command-line interface (CLI)** (see below), **or the local Web UI** (see next section) for video translation and voice cloning.
