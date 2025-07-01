@@ -51,18 +51,23 @@ function App() {
   // Helper to update status for a file
   const updateStatus = (idx, updates) => {
     setStatus(prev => prev.map((s, i) => i === idx ? { ...s, ...updates } : s));
+    if (updates.state && ['processing', 'cancelled', 'cancelling...'].includes(updates.state.toLowerCase())) {
+      setFiles(prevFiles => prevFiles.filter((_, i) => i !== idx));
+    }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video'));
     setFiles(prev => [...prev, ...droppedFiles]);
+    setStatus(prev => [...prev, ...droppedFiles.map(f => ({ name: f.name, progress: 0, state: 'Queued', jobId: null, downloadUrl: null, error: null }))]);
     setIsProcessing(false);
   };
 
   const handleFileInput = (e) => {
     const selectedFiles = Array.from(e.target.files).filter(f => f.type.startsWith('video'));
     setFiles(prev => [...prev, ...selectedFiles]);
+    setStatus(prev => [...prev, ...selectedFiles.map(f => ({ name: f.name, progress: 0, state: 'Queued', jobId: null, downloadUrl: null, error: null }))]);
     setIsProcessing(false);
   };
 
@@ -128,16 +133,16 @@ function App() {
         
         const data = await resp.json();
         if (data.status === 'done') {
-          updateStatus(idx, { state: 'Done', progress: 100 });
+          updateStatus(idx, { state: 'Done', progress: 100, statusMessage: data.status_message });
           // Set download URL
           updateStatus(idx, { downloadUrl: `${API_BASE}/result/${jobId}` });
           done = true;
         } else if (data.status === 'error') {
-          updateStatus(idx, { state: 'Error', error: data.error });
+          updateStatus(idx, { state: 'Error', error: data.error, statusMessage: data.status_message });
           done = true;
         } else {
-          // Optionally update progress if available
-          updateStatus(idx, { state: data.status, progress: data.progress || 0 });
+          // Optionally update progress and status message if available
+          updateStatus(idx, { state: data.status, progress: data.progress || 0, statusMessage: data.status_message });
           await new Promise(res => setTimeout(res, 3000));
         }
       } catch (err) {
@@ -150,6 +155,18 @@ function App() {
           await new Promise(res => setTimeout(res, 5000));
         }
       }
+    }
+  };
+
+  // Cancel job handler
+  const handleCancel = async (idx, jobId) => {
+    updateStatus(idx, { state: 'Cancelling...', statusMessage: 'Cancelling...' });
+    try {
+      const resp = await fetch(`${API_BASE}/cancel/${jobId}`, { method: 'POST' });
+      if (!resp.ok) throw new Error('Failed to cancel job');
+      updateStatus(idx, { state: 'Cancelled', statusMessage: 'Cancelled by user' });
+    } catch (err) {
+      updateStatus(idx, { state: 'Error', error: err.message });
     }
   };
 
@@ -169,7 +186,10 @@ function App() {
           <ul>
             {files.map((file, idx) => (
               <li key={idx}>
-                {file.name} <button onClick={() => handleRemoveFile(idx)}>Remove</button>
+                {file.name}
+                {(!status[idx] || status[idx].state === 'Queued') && (
+                  <button onClick={() => handleRemoveFile(idx)}>Remove</button>
+                )}
               </li>
             ))}
           </ul>
@@ -212,10 +232,20 @@ function App() {
         {status.map((s, idx) => (
           <div key={idx} className="status-item">
             <strong>{s.name}</strong>: {s.state} {s.progress > 0 && `(${s.progress}%)`}
+            {s.statusMessage && s.progress < 100 && (
+              <div style={{ marginTop: 6, color: '#1976d2', fontWeight: 500, fontSize: '1.02rem' }}>{s.statusMessage}</div>
+            )}
             {s.progress > 0 && s.progress < 100 && (
               <div className="progress-bar-container">
                 <div className="progress-bar" style={{ width: `${s.progress}%` }} />
               </div>
+            )}
+            {/* Cancel button for in-progress jobs */}
+            {s.jobId && s.state && s.state.toLowerCase() === 'processing' && (
+              <button style={{ marginLeft: 12, background: '#e53935', color: '#fff', border: 'none', borderRadius: 5, padding: '0.3rem 0.9rem', cursor: 'pointer', fontWeight: 600 }}
+                onClick={() => handleCancel(idx, s.jobId)}
+                disabled={s.state === 'Cancelling...'}
+              >Cancel</button>
             )}
             {s.downloadUrl && (
               <a href={s.downloadUrl} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 12 }}>
