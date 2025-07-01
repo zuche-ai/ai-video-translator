@@ -52,7 +52,7 @@ class TestVideoEditor(unittest.TestCase):
         
         # Verify ffmpeg calls
         mock_ffmpeg.input.assert_called_once_with(self.test_video_path)
-        mock_input.video.filter.assert_called_once_with('subtitles', self.test_srt_path)
+        mock_input.video.filter.assert_called_once_with('subtitles', self.test_srt_path, force_style='Fontsize=24')
         mock_ffmpeg.output.assert_called_once_with(mock_video, mock_audio, self.test_output_path, vcodec='libx264', acodec='aac')
         mock_ffmpeg.run.assert_called_once_with(mock_stream, overwrite_output=True, quiet=True)
     

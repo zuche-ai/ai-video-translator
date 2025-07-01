@@ -12,24 +12,27 @@ This project now supports running in Docker containers for easy deployment and c
 ### Option 1: Using the Helper Script
 
 ```bash
-# Make the script executable (first time only)
-chmod +x docker-run.sh
+# Development mode
+./docker/docker-run.sh
 
-# Start the services
-./docker-run.sh
+# Production mode
+./docker/run-prod.sh
 ```
 
 ### Option 2: Manual Docker Compose
 
 ```bash
-# Build and start services
-docker-compose up --build -d
+# Development mode
+docker-compose -f docker/docker-compose.yml up --build -d
+
+# Production mode
+docker-compose -f docker/docker-compose.prod.yml up --build -d
 
 # Check status
-docker-compose ps
+docker-compose -f docker/docker-compose.yml ps
 
 # View logs
-docker-compose logs -f
+docker-compose -f docker/docker-compose.yml logs -f
 ```
 
 ## Accessing the Application
@@ -58,22 +61,24 @@ docker-compose logs -f
 ## Management Commands
 
 ```bash
-# Stop services
-docker-compose down
+# Development mode
+docker-compose -f docker/docker-compose.yml down
+docker-compose -f docker/docker-compose.yml restart
+docker-compose -f docker/docker-compose.yml logs -f backend
+docker-compose -f docker/docker-compose.yml logs -f frontend
+docker-compose -f docker/docker-compose.yml build
+docker-compose -f docker/docker-compose.yml up -d
 
-# Restart services
-docker-compose restart
-
-# View logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
-
-# Rebuild after code changes
-docker-compose build
-docker-compose up -d
+# Production mode
+docker-compose -f docker/docker-compose.prod.yml down
+docker-compose -f docker/docker-compose.prod.yml restart
+docker-compose -f docker/docker-compose.prod.yml logs -f backend
+docker-compose -f docker/docker-compose.prod.yml logs -f frontend
+docker-compose -f docker/docker-compose.prod.yml build
+docker-compose -f docker/docker-compose.prod.yml up -d
 
 # Clean up (removes containers and images)
-docker-compose down --rmi all --volumes --remove-orphans
+docker-compose -f docker/docker-compose.yml down --rmi all --volumes --remove-orphans
 ```
 
 ## Development
@@ -81,12 +86,15 @@ docker-compose down --rmi all --volumes --remove-orphans
 ### Rebuilding After Changes
 
 ```bash
-# Rebuild specific service
-docker-compose build backend
-docker-compose build frontend
+# Development mode
+docker-compose -f docker/docker-compose.yml build backend
+docker-compose -f docker/docker-compose.yml build frontend
+docker-compose -f docker/docker-compose.yml up --build -d
 
-# Rebuild and restart
-docker-compose up --build -d
+# Production mode
+docker-compose -f docker/docker-compose.prod.yml build backend
+docker-compose -f docker/docker-compose.prod.yml build frontend
+docker-compose -f docker/docker-compose.prod.yml up --build -d
 ```
 
 ### Debugging
@@ -122,6 +130,42 @@ curl http://localhost:5001/health
 curl http://localhost:3000
 ```
 
+## Docker Organization
+
+The Docker files are organized in the `docker/` directory:
+
+```
+docker/
+├── docker-compose.yml          # Development configuration
+├── docker-compose.prod.yml     # Production configuration
+├── Dockerfile                  # Development backend
+├── Dockerfile.prod             # Production backend
+├── Dockerfile.frontend.prod    # Production frontend
+├── nginx.prod.conf             # Production nginx config
+├── docker-run.sh               # Development startup script
+├── run-prod.sh                 # Production startup script
+├── production.env              # Production environment variables
+└── PRODUCTION.md               # Production deployment guide
+```
+
+## Development vs Production
+
+### Development Mode
+- Uses Flask development server
+- Exposes ports 3000 (frontend) and 5001 (backend)
+- Includes development tools and debugging
+- Suitable for local development and testing
+
+### Production Mode
+- Uses Gunicorn WSGI server
+- Nginx reverse proxy with security headers
+- Non-root users for security
+- Health checks and monitoring
+- Rate limiting and resource constraints
+- Optimized for performance and security
+
+For detailed production deployment instructions, see [docker/PRODUCTION.md](docker/PRODUCTION.md).
+
 ## Production Considerations
 
 - Use production WSGI server (gunicorn) instead of Flask development server
@@ -129,6 +173,9 @@ curl http://localhost:3000
 - Set up reverse proxy (nginx) for SSL termination
 - Use Docker secrets for sensitive configuration
 - Implement proper backup strategy for volumes
+- Enable security headers and rate limiting
+- Use non-root users in containers
+- Set up monitoring and health checks
 
 ## Architecture
 

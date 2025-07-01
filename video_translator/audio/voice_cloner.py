@@ -12,6 +12,8 @@ import librosa
 from TTS.api import TTS
 import torch
 import webrtcvad
+import traceback
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 class VoiceCloner:
     """Voice cloning using Coqui XTTS for true voice cloning."""
     
-    def __init__(self, model_name: str = "tts_models/multilingual/multi-dataset/xtts_v2"):
+    def __init__(self, model_name="tts_models/multilingual/multi-dataset/xtts_v2"):
         """
         Initialize the voice cloner with XTTS model.
         
@@ -31,160 +33,125 @@ class VoiceCloner:
         self._initialize_model()
     
     def _initialize_model(self):
-        """Initialize the XTTS model."""
+        """Initialize the XTTS model with proper error handling."""
         try:
-            logger.info(f"Loading XTTS model: {self.model_name}")
+            # Set environment variables
+            os.environ["COQUI_TOS_AGREED"] = "1"
+            os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Force CPU
             
-            # Clear memory before loading XTTS
+            # Clear GPU memory and garbage collect
             import gc
             gc.collect()
             if hasattr(torch, 'cuda') and torch.cuda.is_available():
                 torch.cuda.empty_cache()
             
-            # Fix for PyTorch 2.6+ compatibility
-            # Monkey patch torch.load to use weights_only=False for XTTS
+            # Fix PyTorch 2.6 compatibility issue with weights_only
             original_torch_load = torch.load
-            
             def safe_torch_load(*args, **kwargs):
                 if 'weights_only' not in kwargs:
                     kwargs['weights_only'] = False
                 return original_torch_load(*args, **kwargs)
-            
             torch.load = safe_torch_load
             
-            # Try to initialize with specific device and settings
-            try:
-                # First try with CPU to avoid GPU issues
-                logger.info("Attempting to load XTTS v2 on CPU...")
-                self.tts = TTS(model_name=self.model_name, progress_bar=False)
-                logger.info("XTTS model loaded successfully on CPU")
-            except Exception as cpu_error:
-                logger.warning(f"CPU loading failed: {cpu_error}")
-                # Try with different model variant
-                try:
-                    logger.info("Attempting to load XTTS v1.1...")
-                    self.tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v1.1", progress_bar=False)
-                    logger.info("XTTS v1.1 model loaded successfully")
-                except Exception as v1_error:
-                    logger.error(f"XTTS v1.1 also failed: {v1_error}")
-                    raise cpu_error
-                    
+            # Load model directly (will download if not present)
+            self.tts = TTS(
+                model_name=self.model_name,
+                progress_bar=False,
+                gpu=False  # Explicitly disable GPU
+            )
+            
+            logger.info(f"XTTS model '{self.model_name}' loaded successfully.")
+            
         except Exception as e:
             logger.error(f"Failed to load XTTS model: {e}")
-            logger.info("Falling back to basic TTS model...")
-            try:
-                # Fallback to a simpler model
-                logger.info("Loading fallback TTS model...")
-                self.tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC", progress_bar=False)
-                logger.info("Fallback TTS model loaded successfully")
-            except Exception as fallback_error:
-                logger.error(f"Failed to load fallback TTS model: {fallback_error}")
-                # Try one more fallback
-                try:
-                    logger.info("Trying final fallback TTS model...")
-                    self.tts = TTS(model_name="tts_models/en/ljspeech/glow-tts", progress_bar=False)
-                    logger.info("Final fallback TTS model loaded successfully")
-                except Exception as final_error:
-                    logger.error(f"All TTS models failed to load: {final_error}")
-                    raise RuntimeError(f"Could not load any TTS model: {e}")
+            logger.error(traceback.format_exc())
+            raise RuntimeError(f"Voice cloning initialization failed: {e}")
     
-    def _get_fallback_tts(self):
-        """Get a fallback TTS model if the main one fails."""
+    def _get_supported_languages(self, model_name):
         try:
-            return TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC")
+            # Accept Coqui TTS license terms
+            os.environ["COQUI_TOS_AGREED"] = "1"
+            tts = TTS(model_name=model_name, progress_bar=False)
+            langs = set()
+            if hasattr(tts, 'languages') and tts.languages:
+                langs = set(list(tts.languages))
+            elif hasattr(tts, 'list_languages') and callable(tts.list_languages):
+                langs = set(list(tts.list_languages()))
+            return langs
         except Exception as e:
-            logger.error(f"Failed to load fallback TTS: {e}")
-            return None
+            logger.error(f"Could not get supported languages for {model_name}: {e}")
+            return set()
+
+    def _get_fallback_tts(self, language):
+        """Get a fallback TTS model that supports the requested language."""
+        # Accept Coqui TTS license terms
+        os.environ["COQUI_TOS_AGREED"] = "1"
+        fallback_models = [
+            "tts_models/multilingual/multi-dataset/xtts_v2",
+            "tts_models/multilingual/multi-dataset/xtts_v1.1",
+            "tts_models/multilingual/multi-dataset/your_tts",
+            "tts_models/multilingual/multi-dataset/coqui_studio_TTS",
+            "tts_models/en/ljspeech/tacotron2-DDC"  # last resort
+        ]
+        for model_name in fallback_models:
+            langs = self._get_supported_languages(model_name)
+            if not langs or language in langs or language.lower() in langs or language.replace('-', '_') in langs:
+                try:
+                    logger.info(f"Trying fallback TTS model '{model_name}' for language '{language}'...")
+                    tts = TTS(model_name=model_name, progress_bar=False)
+                    # Double-check language support
+                    if not langs or language in langs or language.lower() in langs or language.replace('-', '_') in langs:
+                        logger.info(f"Loaded fallback TTS model '{model_name}' for language '{language}'")
+                        return tts
+                except Exception as e:
+                    logger.error(f"Failed to load fallback TTS model '{model_name}': {e}")
+        logger.error(f"No fallback TTS model found that supports language '{language}'")
+        return None
     
-    def clone_voice(self, 
-                   reference_audio_path: str, 
-                   text: str, 
-                   output_path: str,
-                   language: str = "en",
-                   speed: float = 1.0) -> str:
+    def clone_voice(self, text, audio_path, output_path, language=None):
         """
         Clone voice from reference audio and generate speech for given text.
         
         Args:
-            reference_audio_path: Path to reference audio file
-            text: Text to synthesize
-            output_path: Path to save generated audio
-            language: Language code (e.g., 'en', 'es', 'fr')
-            speed: Speech speed multiplier
-            
+            text (str): Text to synthesize
+            audio_path (str): Path to reference audio file
+            output_path (str): Path to save generated audio
+            language (str): Language code (optional)
+        
         Returns:
-            Path to generated audio file
+            str: Path to generated audio file
         """
         try:
             if self.tts is None:
                 raise RuntimeError("TTS model not initialized")
-                
-            logger.info(f"Cloning voice from {reference_audio_path}")
-            logger.info(f"Text to synthesize: {text[:100]}...")
-            logger.info(f"Language: {language}, Speed: {speed}")
             
-            # Validate inputs
-            if not os.path.exists(reference_audio_path):
-                raise FileNotFoundError(f"Reference audio file not found: {reference_audio_path}")
-            
-            if not text.strip():
-                raise ValueError("Text cannot be empty")
+            logger.info(f"Cloning voice for text: {text[:50]}...")
+            logger.info(f"Reference audio: {audio_path}")
+            logger.info(f"Output path: {output_path}")
+            logger.info(f"Language: {language}")
             
             # Generate speech with voice cloning
-            try:
-                logger.info("Starting TTS generation...")
+            if language:
                 self.tts.tts_to_file(
                     text=text,
-                    speaker_wav=reference_audio_path,
+                    speaker_wav=audio_path,
                     language=language,
-                    file_path=output_path,
-                    speed=speed
+                    file_path=output_path
                 )
-                logger.info("TTS generation completed successfully")
-            except Exception as tts_error:
-                logger.error(f"TTS generation failed: {tts_error}")
-                logger.error(f"Error type: {type(tts_error).__name__}")
-                
-                # Check if it's the specific "Error while processing frame" issue
-                if "Error while processing frame" in str(tts_error):
-                    logger.error("Detected 'Error while processing frame' - this is a known XTTS issue")
-                    logger.info("Trying with different parameters...")
-                    
-                    # Try with different parameters
-                    try:
-                        self.tts.tts_to_file(
-                            text=text,
-                            speaker_wav=reference_audio_path,
-                            language=language,
-                            file_path=output_path
-                        )
-                        logger.info("TTS generation succeeded with default parameters")
-                    except Exception as retry_error:
-                        logger.error(f"Retry also failed: {retry_error}")
-                        raise RuntimeError(f"XTTS processing frame error: {tts_error}")
-                else:
-                    # Try with different parameters if the first attempt fails
-                    logger.info("Retrying with default speed...")
-                    self.tts.tts_to_file(
-                        text=text,
-                        speaker_wav=reference_audio_path,
-                        language=language,
-                        file_path=output_path
-                    )
-            
-            # Verify output file was created
-            if not os.path.exists(output_path):
-                raise RuntimeError(f"Output file was not created: {output_path}")
+            else:
+                self.tts.tts_to_file(
+                    text=text,
+                    speaker_wav=audio_path,
+                    file_path=output_path
+                )
             
             logger.info(f"Voice cloning completed: {output_path}")
             return output_path
             
         except Exception as e:
             logger.error(f"Voice cloning failed: {e}")
-            logger.error(f"Reference audio: {reference_audio_path}")
-            logger.error(f"Text length: {len(text)}")
-            logger.error(f"Language: {language}")
-            raise
+            logger.error(traceback.format_exc())
+            raise RuntimeError(f"Voice cloning failed: {e}")
     
     def batch_clone_voice(self, 
                          reference_audio_path: str,
@@ -231,11 +198,10 @@ class VoiceCloner:
                 else:
                     # Try normal voice cloning
                     self.clone_voice(
-                        reference_audio_path=reference_audio_path,
                         text=text,
+                        audio_path=reference_audio_path,
                         output_path=output_path,
-                        language=language,
-                        speed=speed
+                        language=language
                     )
                 
                 output_paths.append(output_path)
@@ -249,7 +215,7 @@ class VoiceCloner:
                 if "Error while processing frame" in str(e) and not use_fallback:
                     logger.error("Detected processing frame error, switching to fallback TTS")
                     use_fallback = True
-                    fallback_tts = self._get_fallback_tts()
+                    fallback_tts = self._get_fallback_tts(language)
                     
                     if fallback_tts:
                         try:
@@ -342,26 +308,21 @@ class VoiceCloner:
             logger.error(f"Failed to process audio: {e}")
             raise
     
-    def get_supported_languages(self) -> List[str]:
-        """Get list of supported languages for XTTS."""
-        return [
-            "en", "es", "fr", "de", "it", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh-cn", 
-            "ja", "ko", "hi", "th", "sv", "da", "no", "fi", "hu", "ro", "bg", "hr", "sk", 
-            "sl", "et", "lv", "lt", "mt", "el", "he", "id", "ms", "vi", "tl", "ur", "bn", 
-            "ta", "te", "ml", "kn", "gu", "pa", "si", "my", "km", "lo", "ne", "am", "or", 
-            "as", "sa", "mr", "be", "uk", "ka", "hy", "az", "eu", "gl", "ca", "cy", "ga", 
-            "is", "mk", "sq", "bs", "sr", "me", "mn", "ky", "kk", "uz", "tg", "tk", "ps", 
-            "fa", "ku", "yi", "bo", "dz", "ug", "wo", "rw", "so", "sw", "zu", "xh", "af", 
-            "st", "tn", "ts", "ss", "ve", "ny", "sn", "lg", "rw", "ak", "tw", "ee", "ff", 
-            "ha", "ig", "yo", "mg", "om", "ti", "am", "ar", "az", "be", "bg", "bn", "bs", 
-            "ca", "cs", "cy", "da", "de", "el", "en", "es", "et", "eu", "fa", "fi", "fr", 
-            "ga", "gl", "gu", "he", "hi", "hr", "hu", "hy", "id", "is", "it", "ja", "ka", 
-            "kk", "km", "kn", "ko", "ku", "ky", "lg", "lo", "lt", "lv", "mg", "mk", "ml", 
-            "mn", "mr", "ms", "mt", "my", "ne", "nl", "no", "om", "or", "pa", "pl", "ps", 
-            "pt", "ro", "rw", "sa", "si", "sk", "sl", "sn", "so", "sq", "sr", "ss", "st", 
-            "sv", "sw", "ta", "te", "tg", "th", "ti", "tk", "tl", "tn", "tr", "ts", "tw", 
-            "ug", "uk", "ur", "uz", "ve", "vi", "wo", "xh", "yi", "yo", "zh-cn", "zu"
-        ]
+    def get_supported_languages(self):
+        """Get list of supported languages for the current model."""
+        try:
+            if self.tts is None:
+                return []
+            
+            # Try to get supported languages from the model
+            if hasattr(self.tts, 'languages') and self.tts.languages:
+                return self.tts.languages
+            else:
+                # Default languages for XTTS v2
+                return ['en', 'es', 'fr', 'de', 'it', 'pt', 'pl', 'tr', 'ru', 'nl', 'cs', 'ar', 'zh-cn', 'ja', 'ko', 'hi']
+        except Exception as e:
+            logger.warning(f"Error getting supported languages: {e}")
+            return []
     
     def validate_reference_audio(self, audio_path: str) -> bool:
         """
