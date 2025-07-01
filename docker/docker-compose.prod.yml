@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.prod
+    container_name: video-translator-backend
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - uploads:/app/uploads
+      - results:/app/results
+      - logs:/app/logs
+    networks:
+      - video-translator-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend.prod
+    container_name: video-translator-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"  # For HTTPS when configured
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - video-translator-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # Optional: Add a reverse proxy for SSL termination
+  # nginx-proxy:
+  #   image: nginx:alpine
+  #   container_name: video-translator-proxy
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx-proxy.conf:/etc/nginx/nginx.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - frontend
+  #   networks:
+  #     - video-translator-network
+
+volumes:
+  uploads:
+    driver: local
+  results:
+    driver: local
+  logs:
+    driver: local
+
+networks:
+  video-translator-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 

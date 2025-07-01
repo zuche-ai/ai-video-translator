@@ -5,6 +5,7 @@ import uuid
 import os
 import tempfile
 import traceback
+import sys
 from flask_cors import CORS
 
 # Import your main pipeline logic (refactor main.py if needed)
@@ -21,9 +22,30 @@ RESULTS_DIR = tempfile.gettempdir()
 
 
 def run_pipeline(job_id, input_path, options):
+    print(f"[API] ===== THREAD STARTED FOR JOB {job_id} =====")
+    print(f"[API] Thread ID: {threading.get_ident()}")
+    print(f"[API] Current working directory: {os.getcwd()}")
+    print(f"[API] Python path: {sys.path}")
+    
     try:
+        print(f"[API] Starting pipeline for job {job_id}")
+        print(f"[API] Input path: {input_path}")
+        print(f"[API] Options: {options}")
+        
+        # Test import
+        print(f"[API] Testing imports...")
+        try:
+            from video_translator.main import process
+            print(f"[API] Import successful")
+        except Exception as import_error:
+            print(f"[API] Import failed: {import_error}")
+            print(f"[API] Import traceback: {traceback.format_exc()}")
+            raise
+        
         jobs[job_id]['status'] = 'processing'
         jobs[job_id]['progress'] = 0
+        print(f"[API] Job status set to processing, progress 0")
+        
         # Prepare output path with descriptive name
         orig_filename = jobs[job_id].get('orig_filename', 'video')
         base, _ = os.path.splitext(orig_filename)
@@ -31,16 +53,25 @@ def run_pipeline(job_id, input_path, options):
             RESULTS_DIR,
             f"{base}_{options['src_lang']}_{options['tgt_lang']}_translated_{job_id}.mp4"
         )
+        print(f"[API] Output path: {output_path}")
+        
         # Step-based progress updates
         def progress_hook(step):
+            print(f"[API] Progress hook called with step {step}")
             if step == 1:
                 jobs[job_id]['progress'] = 20
+                print(f"[API] Progress set to 20%")
             elif step == 2:
                 jobs[job_id]['progress'] = 40
+                print(f"[API] Progress set to 40%")
             elif step == 3:
                 jobs[job_id]['progress'] = 60
+                print(f"[API] Progress set to 60%")
             elif step == 4:
                 jobs[job_id]['progress'] = 80
+                print(f"[API] Progress set to 80%")
+        
+        print(f"[API] About to call process function...")
         # Call the main process pipeline, injecting progress updates at key steps
         process(
             input_path=input_path,
@@ -55,13 +86,19 @@ def run_pipeline(job_id, input_path, options):
             debug=False,
             progress_hook=progress_hook
         )
+        print(f"[API] Process function completed successfully")
         jobs[job_id]['status'] = 'done'
         jobs[job_id]['progress'] = 100
         jobs[job_id]['result_path'] = output_path
+        print(f"[API] Job completed successfully")
     except Exception as e:
+        print(f"[API] Error in pipeline: {e}")
+        print(f"[API] Traceback: {traceback.format_exc()}")
         jobs[job_id]['status'] = 'error'
         jobs[job_id]['error'] = str(e)
         jobs[job_id]['traceback'] = traceback.format_exc()
+    finally:
+        print(f"[API] ===== THREAD ENDING FOR JOB {job_id} =====")
 
 @app.route('/process', methods=['POST'])
 def process_route():
@@ -85,6 +122,7 @@ def process_route():
     }
 
     job_id = str(uuid.uuid4())
+    print(f"[API] Creating job {job_id} for file {filename}")
     jobs[job_id] = {
         'status': 'queued',
         'progress': 0,
@@ -92,8 +130,17 @@ def process_route():
         'error': None,
         'orig_filename': filename
     }
+    print(f"[API] Job created, about to start thread...")
+    print(f"[API] Thread target: {run_pipeline}")
+    print(f"[API] Thread args: {job_id}, {input_path}, {options}")
     thread = threading.Thread(target=run_pipeline, args=(job_id, input_path, options))
+    print(f"[API] Thread object created: {thread}")
+    print(f"[API] Thread is alive before start: {thread.is_alive()}")
+    print(f"[API] Thread created, starting...")
     thread.start()
+    print(f"[API] Thread started successfully")
+    print(f"[API] Thread is alive after start: {thread.is_alive()}")
+    print(f"[API] Thread name: {thread.name}")
     return jsonify({'job_id': job_id})
 
 @app.route('/status/<job_id>', methods=['GET'])
@@ -110,5 +157,9 @@ def result(job_id):
         return jsonify({'error': 'Result not available'}), 404
     return send_file(job['result_path'], as_attachment=True)
 
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'healthy', 'jobs': len(jobs)})
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5001) 
+    app.run(debug=True, host='0.0.0.0', port=5001) 

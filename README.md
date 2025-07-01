@@ -18,6 +18,8 @@ A Python application that transcribes, translates, and adds subtitles to videos 
 
 ## Installation
 
+### Option 1: Manual Installation
+
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/zuche-ai/ai-video-translator.git
@@ -40,6 +42,79 @@ A Python application that transcribes, translates, and adds subtitles to videos 
    # Windows
    # Download from https://ffmpeg.org/download.html
    ```
+
+### Option 2: Docker (Recommended)
+
+For easy deployment and consistent environments, use Docker:
+
+#### Development Mode
+
+1. **Install Docker Desktop** (if not already installed)
+2. **Clone the repository:**
+   ```bash
+   git clone https://github.com/zuche-ai/ai-video-translator.git
+   cd ai-video-translator
+   ```
+
+3. **Start with Docker:**
+   ```bash
+   # Using the helper script
+   ./docker/docker-run.sh
+   
+   # Or manually
+   docker-compose -f docker/docker-compose.yml up --build -d
+   ```
+
+4. **Access the application:**
+   - Frontend UI: http://localhost:3000
+   - Backend API: http://localhost:5001
+   - Health Check: http://localhost:5001/health
+
+**Note**: The frontend uses nginx proxy to communicate with the backend, avoiding CORS issues. If you encounter "Failed to fetch" errors, ensure you're accessing the frontend at localhost:3000 (not localhost:80).
+
+#### Production Mode
+
+For production deployment with enhanced security and performance:
+
+1. **Configure environment:**
+   ```bash
+   cp docker/production.env docker/.env
+   # Edit docker/.env with your production values
+   ```
+
+2. **Start production services:**
+   ```bash
+   ./docker/run-prod.sh
+   ```
+
+3. **Access the application:**
+   - Frontend: http://localhost (or your domain)
+   - Backend API: http://localhost/api
+
+See [DOCKER.md](DOCKER.md) for detailed Docker documentation.
+See [docker/PRODUCTION.md](docker/PRODUCTION.md) for production deployment guide.
+
+## Model Download Required
+
+Before running the Docker containers, you must download the required XTTS models locally:
+
+```sh
+python download_xtts.py
+```
+
+This will populate the `models/` directory with the required files.
+
+When running Docker, mount the local models directory into the container:
+
+```sh
+docker-compose up -d
+```
+
+or, if running manually:
+
+```sh
+docker run -v $(pwd)/models:/app/models/xtts ...
+```
 
 ## Usage
 
@@ -192,6 +267,24 @@ The voice cloning feature uses **Coqui TTS** with the **XTTS v2** model, which p
 4. **Voice Cloning**: Generates translated audio using the cloned voice
 5. **Audio Synchronization**: Aligns translated audio with original timing
 6. **Video Processing**: Combines video, subtitles, and translated audio
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Failed to fetch" error in browser**: 
+   - Ensure you're accessing the frontend at http://localhost:3000 (not localhost:80)
+   - The frontend uses nginx proxy to communicate with the backend
+   - Check that both containers are running: `docker ps`
+
+2. **Voice cloning errors**: 
+   - The application now handles TTS model compatibility issues automatically
+   - If the main XTTS model fails, it will fall back to multilingual models
+   - Language settings are now properly respected for voice cloning
+   - Spanish text will be pronounced with Spanish accent, not English
+
+3. **Port conflicts**: 
+   - Change ports in `docker/docker-compose.yml` if 3000 or 5001 are in use
 
 ## Error Handling
 

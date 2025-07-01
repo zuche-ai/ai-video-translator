@@ -20,6 +20,9 @@ const AUDIO_MODES = [
 ];
 
 function App() {
+  // API base URL - use nginx proxy for all environments
+  const API_BASE = '/api';
+    
   const [files, setFiles] = useState([]);
   const [srcLang, setSrcLang] = useState('en');
   const [tgtLang, setTgtLang] = useState('es');
@@ -88,7 +91,7 @@ function App() {
     formData.append('caption_font_size', captionFontSize);
     updateStatus(idx, { state: 'Uploading...' });
     try {
-      const resp = await fetch('http://localhost:5001/process', {
+      const resp = await fetch(`${API_BASE}/process`, {
         method: 'POST',
         body: formData,
       });
@@ -104,15 +107,30 @@ function App() {
 
   const pollStatus = async (jobId, idx) => {
     let done = false;
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 5;
+    
     while (!done) {
       try {
-        const resp = await fetch(`http://localhost:5001/status/${jobId}`);
-        if (!resp.ok) throw new Error('Status check failed');
+        const resp = await fetch(`${API_BASE}/status/${jobId}`);
+        if (!resp.ok) {
+          consecutiveErrors++;
+          if (consecutiveErrors >= maxConsecutiveErrors) {
+            throw new Error(`Status check failed after ${maxConsecutiveErrors} attempts`);
+          }
+          // Wait longer on errors and continue trying
+          await new Promise(res => setTimeout(res, 5000));
+          continue;
+        }
+        
+        // Reset error counter on successful response
+        consecutiveErrors = 0;
+        
         const data = await resp.json();
         if (data.status === 'done') {
           updateStatus(idx, { state: 'Done', progress: 100 });
           // Set download URL
-          updateStatus(idx, { downloadUrl: `http://localhost:5001/result/${jobId}` });
+          updateStatus(idx, { downloadUrl: `${API_BASE}/result/${jobId}` });
           done = true;
         } else if (data.status === 'error') {
           updateStatus(idx, { state: 'Error', error: data.error });
@@ -123,8 +141,14 @@ function App() {
           await new Promise(res => setTimeout(res, 3000));
         }
       } catch (err) {
-        updateStatus(idx, { state: 'Error', error: err.message });
-        done = true;
+        consecutiveErrors++;
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          updateStatus(idx, { state: 'Error', error: err.message });
+          done = true;
+        } else {
+          // Wait longer on errors and continue trying
+          await new Promise(res => setTimeout(res, 5000));
+        }
       }
     }
   };

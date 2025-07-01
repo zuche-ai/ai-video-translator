@@ -15,8 +15,35 @@ from .audio.voice_cloner import VoiceCloner
 
 def process(input_path, output_path, src_lang, tgt_lang, voice_clone, audio_mode, original_volume, add_captions, caption_font_size, debug=False, progress_hook=None):
     try:
+        print(f"[MAIN] Starting process function...")
+        print(f"[MAIN] Input path: {input_path}")
+        print(f"[MAIN] Output path: {output_path}")
+        print(f"[MAIN] Source language: {src_lang}")
+        print(f"[MAIN] Target language: {tgt_lang}")
+        print(f"[MAIN] Voice clone: {voice_clone}")
+        print(f"[MAIN] Audio mode: {audio_mode}")
+        
         print(f"[1/5] Transcribing audio with Whisper...")
-        segments = transcribe_video(input_path, src_lang, debug=debug)
+        print(f"[MAIN] About to call transcribe_video...")
+        segments = transcribe_video(input_path, src_lang, debug=debug, timeout=600)  # 10 minute timeout
+        print(f"[MAIN] transcribe_video completed successfully")
+        
+        # Check if transcription found any speech
+        if not segments:
+            print("⚠️ No speech detected in video. Creating video with subtitles only.")
+            # Create a simple video with a message
+            srt_path = generate_srt([{
+                'start': 0.0,
+                'end': 5.0,
+                'text': 'No speech detected in this video'
+            }], input_path, tgt_lang, debug=debug)
+            burn_subtitles(input_path, srt_path, output_path, caption_font_size=caption_font_size, debug=debug)
+            if progress_hook:
+                progress_hook(3)
+            if progress_hook:
+                progress_hook(4)
+            return
+        
         if progress_hook:
             progress_hook(1)
 
@@ -39,19 +66,16 @@ def process(input_path, output_path, src_lang, tgt_lang, voice_clone, audio_mode
                 print("About to initialize VoiceCloner...")
                 voice_cloner = VoiceCloner()
                 print("Voice cloner initialized successfully")
+                
+                # Check if TTS model was actually loaded
+                if voice_cloner.tts is None:
+                    raise RuntimeError("TTS model failed to load")
+                    
             except Exception as e:
                 print(f"Failed to initialize voice cloner: {e}")
                 import traceback
                 traceback.print_exc()
-                print("Falling back to subtitles-only mode...")
-                voice_clone = False
-                srt_path = generate_srt(translated_segments, input_path, tgt_lang, debug=debug)
-                burn_subtitles(input_path, srt_path, output_path, caption_font_size=caption_font_size, debug=debug)
-                if progress_hook:
-                    progress_hook(3)
-                if progress_hook:
-                    progress_hook(4)
-                return
+                raise RuntimeError(f"Voice cloning initialization failed: {e}")
             # Extract reference audio from video
             import ffmpeg
             temp_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name

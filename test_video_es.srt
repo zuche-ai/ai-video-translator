@@ -1,8 +1,3 @@
-1
-00:00:00,000 --> 00:00:05,000
-Hello world
-
-2
-00:00:05,000 --> 00:00:10,000
-How are you?
-
+version https://git-lfs.github.com/spec/v1
+oid sha256:ee9e5e4e8a2b4e6d7f56b0a41b10c3b953d75f3cfd6c98bce3c3ddc0957e5601
+size 91
