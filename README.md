@@ -218,7 +218,7 @@ python -m video_translator.audio_translation.cli --input audio.wav --output tran
 python -m video_translator.audio_translation.cli --list-formats
 ```
 
-**Supported Audio Formats**: MP3, WAV, M4A, FLAC, OGG, AAC
+**Supported Audio Formats**: MP3, WAV, M4A, FLAC, OGG, AAC, OPUS (WhatsApp)
 
 See [Audio Translation Documentation](video_translator/audio_translation/README.md) for detailed usage and examples.
 

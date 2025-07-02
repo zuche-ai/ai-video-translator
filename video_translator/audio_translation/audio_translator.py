@@ -153,7 +153,7 @@ class AudioTranslator:
     
     def get_supported_formats(self) -> list:
         """Get list of supported audio input formats."""
-        return ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac']
+        return ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.opus']
     
     def validate_input_file(self, file_path: str) -> bool:
         """Validate that the input file is a supported audio format."""

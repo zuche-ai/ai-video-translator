@@ -44,14 +44,14 @@ class TestAudioTranslator:
         translator = AudioTranslator()
         formats = translator.get_supported_formats()
         
-        expected_formats = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac']
+        expected_formats = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.opus']
         assert formats == expected_formats
     
     def test_validate_input_file_valid(self):
         """Test input file validation with valid formats."""
         translator = AudioTranslator()
         
-        valid_files = ['audio.mp3', 'audio.wav', 'audio.m4a', 'audio.flac']
+        valid_files = ['audio.mp3', 'audio.wav', 'audio.m4a', 'audio.flac', 'audio.opus']
         for file_path in valid_files:
             assert translator.validate_input_file(file_path) is True
     

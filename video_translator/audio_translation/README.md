@@ -81,6 +81,7 @@ The module supports all languages available in:
 - FLAC (.flac)
 - OGG (.ogg)
 - AAC (.aac)
+- OPUS (.opus) - WhatsApp, Discord, WebRTC
 
 ## Architecture
 
