@@ -10,6 +10,7 @@ A Python application that transcribes, translates, and adds subtitles to videos 
 - **Translation**: Translates transcriptions using ArgosTranslate
 - **Subtitle Generation**: Creates SRT subtitle files from translated text
 - **Voice Cloning**: Clone the original speaker's voice for translated audio using Coqui TTS
+- **Audio Translation**: Translate audio files to different languages with voice cloning support
 - **Audio Overlay**: Replace or overlay translated audio on the original video
 - **Video Processing**: Burns subtitles into videos with custom audio options
 - **Error Handling**: Comprehensive error handling with helpful error messages
@@ -199,6 +200,27 @@ python -m video_translator.main --input video.mp4 --src-lang en --tgt-lang es --
 python -m video_translator.main --input video.mp4 --src-lang en --tgt-lang es --output translated_video.mp4 \
   --voice-clone --audio-mode overlay --add-captions --caption-font-size 24
 ```
+
+---
+
+### Audio Translation (New!)
+
+Translate audio files to different languages with voice cloning support:
+
+```bash
+# Basic audio translation with voice cloning
+python -m video_translator.audio_translation.cli --input audio.mp3 --src-lang en --tgt-lang es --voice-clone
+
+# Specify custom output path
+python -m video_translator.audio_translation.cli --input audio.wav --output translated_audio.wav --src-lang en --tgt-lang fr --voice-clone
+
+# List supported audio formats
+python -m video_translator.audio_translation.cli --list-formats
+```
+
+**Supported Audio Formats**: MP3, WAV, M4A, FLAC, OGG, AAC, OPUS (WhatsApp)
+
+See [Audio Translation Documentation](video_translator/audio_translation/README.md) for detailed usage and examples.
 
 ### Parameters
 
