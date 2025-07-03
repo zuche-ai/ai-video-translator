@@ -7,8 +7,11 @@ import tempfile
 import os
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
+import soundfile as sf
+import numpy as np
 
 from video_translator.audio_translation.audio_translator import AudioTranslator
+from video_translator.audio.voice_cloner import VoiceCloner
 
 
 class TestAudioTranslator:
@@ -22,7 +25,7 @@ class TestAudioTranslator:
         assert translator.tgt_lang == "es"
         assert translator.model_size == "base"
         assert translator.voice_clone is False
-        assert translator.voice_cloner is None
+        assert isinstance(translator.voice_cloner, VoiceCloner)
     
     def test_init_custom_params(self):
         """Test AudioTranslator initialization with custom parameters."""
@@ -87,24 +90,31 @@ class TestAudioTranslator:
         
         # Mock voice cloner
         mock_voice_cloner = Mock()
-        mock_voice_cloner.clone_voice.return_value = "/path/to/output.wav"
-        
-        translator = AudioTranslator(voice_clone=True)
-        translator.voice_cloner = mock_voice_cloner
-        
         with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
             temp_path = temp_file.name
-        
-        try:
-            output_path = translator.translate_audio(temp_path)
-            
-            assert output_path == "/path/to/output.wav"
-            mock_transcriber.transcribe_video.assert_called_once()
-            mock_translator.translate_segments.assert_called_once()
-            mock_voice_cloner.clone_voice.assert_called_once()
-            
-        finally:
-            os.unlink(temp_path)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chunk_path = os.path.join(tmpdir, "chunk_0.wav")
+            mock_voice_cloner.clone_voice.return_value = chunk_path
+            mock_voice_cloner.count_xtts_tokens.return_value = 1
+            # Patch _split_text_for_xtts to return a single chunk
+            from video_translator.audio_translation import audio_translator
+            original_split = audio_translator.AudioTranslator._split_text_for_xtts
+            audio_translator.AudioTranslator._split_text_for_xtts = lambda self, text, max_tokens=400: ["Hola mundo"]
+            # Patch _concat_audio_files to avoid file I/O
+            original_concat = audio_translator.AudioTranslator._concat_audio_files
+            audio_translator.AudioTranslator._concat_audio_files = lambda self, audio_paths, output_path: output_path
+            try:
+                translator = AudioTranslator(voice_clone=True)
+                translator.voice_cloner = mock_voice_cloner
+                output_path = translator.translate_audio(temp_path, output_path=chunk_path)
+                assert output_path == chunk_path
+                mock_transcriber.transcribe_video.assert_called_once()
+                mock_translator.translate_segments.assert_called_once()
+                mock_voice_cloner.clone_voice.assert_called()
+            finally:
+                audio_translator.AudioTranslator._split_text_for_xtts = original_split
+                audio_translator.AudioTranslator._concat_audio_files = original_concat
+                os.unlink(temp_path)
     
     def test_translate_audio_file_not_found(self):
         """Test audio translation with non-existent file."""

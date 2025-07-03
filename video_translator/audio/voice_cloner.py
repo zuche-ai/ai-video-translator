@@ -59,6 +59,12 @@ class VoiceCloner:
                 progress_bar=False,
                 gpu=False  # Explicitly disable GPU
             )
+            # Debug: Check if tts_model exists
+            if not hasattr(self.tts, 'tts_model') or self.tts.tts_model is None:
+                logger.error(f"[DEBUG] After TTS init: tts_model is missing! dir(self.tts): {dir(self.tts)}")
+                logger.error(f"[DEBUG] self.tts.__dict__: {self.tts.__dict__}")
+            else:
+                logger.info(f"[DEBUG] After TTS init: tts_model exists: {type(self.tts.tts_model)}")
             
             logger.info(f"XTTS model '{self.model_name}' loaded successfully.")
             
@@ -402,6 +408,33 @@ class VoiceCloner:
                 speech_frames += 1
         speech_percent = speech_frames / max(1, num_frames)
         return speech_percent >= min_speech_percent
+
+    def count_xtts_tokens(self, text: str, language: str = None) -> int:
+        """
+        Count the number of tokens in the text using the XTTS tokenizer.
+        """
+        if not self.tts or not hasattr(self.tts, 'synthesizer') or self.tts.synthesizer is None or not hasattr(self.tts.synthesizer, 'tts_model') or self.tts.synthesizer.tts_model is None:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"[DEBUG] count_xtts_tokens: self.tts type: {type(self.tts)}")
+            logger.error(f"[DEBUG] count_xtts_tokens: self.tts: {self.tts}")
+            if hasattr(self.tts, 'synthesizer'):
+                logger.error(f"[DEBUG] count_xtts_tokens: self.tts.synthesizer: {self.tts.synthesizer}")
+                if hasattr(self.tts.synthesizer, 'tts_model'):
+                    logger.error(f"[DEBUG] count_xtts_tokens: self.tts.synthesizer.tts_model: {self.tts.synthesizer.tts_model}")
+                else:
+                    logger.error(f"[DEBUG] count_xtts_tokens: self.tts.synthesizer has no tts_model attribute")
+            else:
+                logger.error(f"[DEBUG] count_xtts_tokens: self.tts has no synthesizer attribute")
+            raise RuntimeError("XTTS model not initialized or missing tts_model.")
+        tokenizer = getattr(self.tts.synthesizer.tts_model, 'tokenizer', None)
+        if tokenizer is None:
+            raise RuntimeError("XTTS model does not expose a tokenizer.")
+        if language:
+            tokens = tokenizer.encode(text, language)
+        else:
+            tokens = tokenizer.encode(text)
+        return len(tokens)
 
 
 class AudioProcessor:
