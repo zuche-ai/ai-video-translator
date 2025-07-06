@@ -10,6 +10,7 @@ services:
       - ../uploads:/app/uploads
       - ../results:/app/results
       - ../models:/app/models  # Mount pre-downloaded XTTS models
+      - ../models/xtts/tts:/app/.tts/tts  # Mount TTS models directory
     environment:
       - FLASK_ENV=production
       - UPLOAD_FOLDER=/app/uploads

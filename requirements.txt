@@ -13,6 +13,7 @@ requests
 pytest
 pytest-timeout
 transformers==4.35.2
+silero-vad
 
 # Pin torch for XTTS compatibility (PyTorch 2.6+ breaks model loading)
 torch==2.5.1  # Do not upgrade! See https://github.com/coqui-ai/TTS/issues/2000
