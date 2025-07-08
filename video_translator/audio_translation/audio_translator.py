@@ -172,10 +172,6 @@ class AudioTranslator:
         for i, region in enumerate(vad_regions):
             logger.info(f"  Region {i+1}: {region['start']:.2f}s - {region['end']:.2f}s ({'voice' if region['is_voice'] else 'non-voice'})")
         
-        # Step 2: Map Whisper segments to VAD regions (keep all as voice segments for translation)
-        #TODO: bug here with how it calculates time ranges for voice segments
-        #voice_segments, _ = self._map_segments_to_vad(segments, vad_regions)
-        
         # Step 3: Create non-voice segments from pure VAD non-voice regions
         non_voice_segments = self._create_non_voice_segments_from_vad(vad_regions)
         
@@ -260,105 +256,7 @@ class AudioTranslator:
             duration = region['end'] - region['start']
             logger.info(f"  Region {i+1}: {region['start']:.2f}s - {region['end']:.2f}s ({duration:.3f}s, {'voice' if region['is_voice'] else 'non-voice'})")
         
-        # Merge very short regions (less than 200ms) to avoid fragmentation
-        merged_regions = self._merge_short_vad_regions(vad_regions, min_duration=0.1)
-        
-        # Log merged VAD regions
-        logger.info(f"VAD regions after merging:")
-        for i, region in enumerate(merged_regions):
-            duration = region['end'] - region['start']
-            logger.info(f"  Region {i+1}: {region['start']:.2f}s - {region['end']:.2f}s ({duration:.3f}s, {'voice' if region['is_voice'] else 'non-voice'})")
-        
-        return merged_regions
-    
-    def _merge_short_vad_regions(self, regions: List[Dict], min_duration: float = 0.2) -> List[Dict]:
-        """
-        Merge very short VAD regions to reduce fragmentation.
-        
-        Args:
-            regions: List of VAD regions
-            min_duration: Minimum duration in seconds
-            
-        Returns:
-            Merged regions
-        """
-        if not regions:
-            return regions
-        
-        merged = []
-        current = regions[0].copy()
-        
-        for region in regions[1:]:
-            duration = region['end'] - region['start']
-            
-            if duration < min_duration:
-                # Extend current region
-                current['end'] = region['end']
-            else:
-                # Save current region and start new one
-                merged.append(current)
-                current = region.copy()
-        
-        # Add the last region
-        merged.append(current)
-        
-        return merged
-    
-    def _map_segments_to_vad(self, segments: List[Dict], vad_regions: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
-        """
-        Map Whisper segments to VAD regions to determine voice/non-voice classification.
-        
-        Args:
-            segments: Whisper transcription segments
-            vad_regions: VAD regions with voice activity status
-            
-        Returns:
-            Tuple of (voice_segments, non_voice_segments)
-        """
-        voice_segments = []
-        non_voice_segments = []
-        
-        for segment in segments:
-            segment_start = segment['start']
-            segment_end = segment['end']
-            
-            # Find overlapping VAD regions
-            overlapping_regions = []
-            for region in vad_regions:
-                # Check for overlap
-                if (segment_start < region['end'] and segment_end > region['start']):
-                    overlap_start = max(segment_start, region['start'])
-                    overlap_end = min(segment_end, region['end'])
-                    overlap_duration = overlap_end - overlap_start
-                    
-                    overlapping_regions.append({
-                        'region': region,
-                        'overlap_duration': overlap_duration,
-                        'overlap_ratio': overlap_duration / (segment_end - segment_start)
-                    })
-            
-            if not overlapping_regions:
-                # No VAD regions found, treat as voice segment
-                voice_segments.append(segment)
-                continue
-            
-            # Calculate voice activity ratio for this segment
-            total_voice_duration = 0.0
-            total_duration = segment_end - segment_start
-            
-            for overlap in overlapping_regions:
-                if overlap['region']['is_voice']:
-                    total_voice_duration += overlap['overlap_duration']
-            
-            voice_ratio = total_voice_duration / total_duration
-            
-            # Classify segment based on voice ratio
-            if voice_ratio > 0.5:  # More than 50% voice activity
-                voice_segments.append(segment)
-            else:
-                non_voice_segments.append(segment)
-        
-        return voice_segments, non_voice_segments
+        return vad_regions
     
 
     
@@ -463,7 +361,6 @@ class AudioTranslator:
         # Create a temporary file list for ffmpeg
         temp_list_file = os.path.join(os.path.dirname(output_path), "concat_list.txt")
         
-        # TODO: THERE'S A BUG HERE.
         # Create a unified timeline of all segments with proper ordering
         timeline_segments = self._create_timeline_segments(
             voice_files, non_voice_files, voice_segments, non_voice_segments
@@ -518,137 +415,51 @@ class AudioTranslator:
         Returns:
             List of segments with insertion timeline
         """
-        # Create insertion timeline
-        timeline = self._create_insertion_timeline(voice_segments, non_voice_segments)
-        
-        # Map files to timeline entries
         timeline_segments = []
+        # Create simple sorted lists
+        voice_segments_sorted = []
+        non_voice_segments_sorted = []
         
-        # Add voice segments with their original timings preserved
+        # Add voice segments with their original timings
         for i, segment in enumerate(voice_segments):
             if i < len(voice_files):
-                timeline_segments.append({
+                voice_segments_sorted.append({
                     'type': 'voice',
                     'file': voice_files[i],
                     'original_start': segment.get('start', 0),
                     'original_end': segment.get('end', 0),
-                    'insertion_time': segment.get('start', 0),  # Voice segments keep original timing
+                    'insertion_time': segment.get('start', 0),
                     'duration': segment.get('end', 0) - segment.get('start', 0)
                 })
         
-        # Add non-voice segments with their insertion times from timeline
+        # Add non-voice segments with their original timings
         for i, segment in enumerate(non_voice_segments):
             if i < len(non_voice_files):
-                insertion_time = timeline.get(f"non_voice_{i}", segment.get('start', 0))
-                timeline_segments.append({
+                non_voice_segments_sorted.append({
                     'type': 'non_voice',
                     'file': non_voice_files[i],
                     'original_start': segment.get('start', 0),
                     'original_end': segment.get('end', 0),
-                    'insertion_time': insertion_time,
+                    'insertion_time': segment.get('start', 0),
                     'duration': segment.get('end', 0) - segment.get('start', 0)
                 })
         
-        # Sort by insertion time for proper ordering
-        timeline_segments.sort(key=lambda x: x['insertion_time'])
+        # Sort both lists by start time
+        voice_segments_sorted.sort(key=lambda x: x['original_start'])
+        non_voice_segments_sorted.sort(key=lambda x: x['original_start'])
+        
+        # Combine into single timeline
+        for voice_segment in voice_segments_sorted:
+            for non_voice_segment in non_voice_segments_sorted:
+                if non_voice_segment['original_start'] >= voice_segment['original_start'] and non_voice_segment['original_end'] <= voice_segment['original_end']:
+                    timeline_segments.append(non_voice_segment)
+            timeline_segments.append(voice_segment)
         
         logger.info(f"Created timeline with {len(timeline_segments)} segments:")
         for i, segment in enumerate(timeline_segments):
             logger.info(f"  {i+1}. {segment['type']}: insert at {segment['insertion_time']:.2f}s (original: {segment['original_start']:.2f}s - {segment['original_end']:.2f}s)")
         
-        return timeline_segments
-    
-    def _create_insertion_timeline(self, voice_segments: List[Dict], non_voice_segments: List[Dict]) -> Dict[str, float]:
-        """
-        Create an insertion timeline that determines when non-voice segments should be inserted.
-        
-        Args:
-            voice_segments: Voice segments with timing info
-            non_voice_segments: Non-voice segments with timing info
-            
-        Returns:
-            Dictionary mapping non-voice segment indices to insertion times
-        """
-        timeline = {}
-        
-        # Create a timeline of all voice segments
-        voice_timeline = []
-        for segment in voice_segments:
-            voice_timeline.append({
-                'start': segment.get('start', 0),
-                'end': segment.get('end', 0)
-            })
-        
-        # Sort voice timeline by start time
-        voice_timeline.sort(key=lambda x: x['start'])
-        
-        # Find gaps between voice segments where non-voice can be inserted
-        gaps = []
-        current_time = 0.0
-        
-        for voice_seg in voice_timeline:
-            if voice_seg['start'] > current_time:
-                # Found a gap
-                gaps.append({
-                    'start': current_time,
-                    'end': voice_seg['start'],
-                    'duration': voice_seg['start'] - current_time
-                })
-            current_time = max(current_time, voice_seg['end'])
-        
-        # Add final gap if there's space after the last voice segment
-        if voice_timeline:
-            last_voice_end = max(seg['end'] for seg in voice_timeline)
-            gaps.append({
-                'start': last_voice_end,
-                'end': float('inf'),  # Will be adjusted based on non-voice segments
-                'duration': float('inf')
-            })
-        
-        # Sort non-voice segments by their original start time
-        sorted_non_voice = sorted(enumerate(non_voice_segments), key=lambda x: x[1].get('start', 0))
-        
-        # Assign non-voice segments to gaps
-        gap_index = 0
-        for non_voice_idx, non_voice_seg in sorted_non_voice:
-            non_voice_start = non_voice_seg.get('start', 0)
-            non_voice_end = non_voice_seg.get('end', 0)
-            non_voice_duration = non_voice_end - non_voice_start
-            
-            # Find the best gap for this non-voice segment
-            best_gap = None
-            best_gap_idx = None
-            
-            for i, gap in enumerate(gaps[gap_index:], gap_index):
-                if gap['duration'] >= non_voice_duration:
-                    # This gap can fit the non-voice segment
-                    best_gap = gap
-                    best_gap_idx = i
-                    break
-            
-            if best_gap:
-                # Insert non-voice segment at the start of this gap
-                insertion_time = best_gap['start']
-                timeline[f"non_voice_{non_voice_idx}"] = insertion_time
-                
-                # Update the gap
-                remaining_duration = best_gap['duration'] - non_voice_duration
-                if remaining_duration > 0:
-                    # Split the gap
-                    best_gap['start'] = insertion_time + non_voice_duration
-                    best_gap['duration'] = remaining_duration
-                else:
-                    # Gap is fully used, remove it
-                    if best_gap_idx is not None:
-                        gaps.pop(best_gap_idx)
-                
-                logger.info(f"Assigned non-voice segment {non_voice_idx} to gap {best_gap_idx}: insert at {insertion_time:.2f}s")
-            else:
-                # No suitable gap found, insert at original time
-                timeline[f"non_voice_{non_voice_idx}"] = non_voice_start
-                logger.warning(f"No suitable gap found for non-voice segment {non_voice_idx}, using original time {non_voice_start:.2f}s")
-        
-        return timeline
+        return voice_segments_sorted
     
     def _resolve_segment_overlaps(self, segments: List[Dict]) -> List[Dict]:
         """
