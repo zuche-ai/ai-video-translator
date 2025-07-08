@@ -360,8 +360,59 @@ class AudioTranslator:
         
         return voice_segments, non_voice_segments
     
+    def _merge_segments_for_voice_cloning(self, segments: List[Dict], max_chunk_duration: float = 10.0) -> List[Dict]:
+        """
+        Merge Whisper segments into larger chunks for better voice cloning.
+        
+        Args:
+            segments: List of Whisper segments
+            max_chunk_duration: Maximum duration for each chunk in seconds
+            
+        Returns:
+            List of merged segments
+        """
+        if not segments:
+            return []
+        
+        merged_segments = []
+        current_chunk = {
+            'start': segments[0]['start'],
+            'end': segments[0]['end'],
+            'text': segments[0]['text'].strip(),
+            'segments': [segments[0]]
+        }
+        
+        for segment in segments[1:]:
+            chunk_duration = current_chunk['end'] - current_chunk['start']
+            segment_duration = segment['end'] - segment['start']
+            
+            # Check if adding this segment would exceed max duration
+            if chunk_duration + segment_duration > max_chunk_duration:
+                # Save current chunk and start new one
+                merged_segments.append(current_chunk)
+                current_chunk = {
+                    'start': segment['start'],
+                    'end': segment['end'],
+                    'text': segment['text'].strip(),
+                    'segments': [segment]
+                }
+            else:
+                # Add to current chunk
+                current_chunk['end'] = segment['end']
+                current_chunk['text'] += ' ' + segment['text'].strip()
+                current_chunk['segments'].append(segment)
+        
+        # Add the last chunk
+        if current_chunk:
+            merged_segments.append(current_chunk)
+        
+        logger.info(f"Merged {len(segments)} Whisper segments into {len(merged_segments)} voice cloning chunks")
+        for i, chunk in enumerate(merged_segments):
+            logger.info(f"  Chunk {i+1}: {chunk['start']:.2f}s - {chunk['end']:.2f}s ({len(chunk['segments'])} segments)")
+            logger.info(f"    Text: {chunk['text'][:100]}...")
+        
+        return merged_segments
 
-    
     def _generate_voice_audio(self, 
                             segments: List[Dict], 
                             reference_audio_path: Optional[str],
@@ -382,11 +433,14 @@ class AudioTranslator:
         if not reference_audio_path:
             raise ValueError("Reference audio path is required for voice cloning")
         
+        # Merge segments into larger chunks for better voice cloning
+        merged_segments = self._merge_segments_for_voice_cloning(segments, max_chunk_duration=10.0)
+        
         audio_files = []
         texts = []
         
-        for i, segment in enumerate(segments):
-            text = segment['text'].strip()
+        for i, chunk in enumerate(merged_segments):
+            text = chunk['text'].strip()
             if text:
                 texts.append(text)
         
