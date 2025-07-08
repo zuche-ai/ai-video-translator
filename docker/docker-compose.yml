@@ -26,11 +26,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8G
-          cpus: '8.0'
+          memory: 16G
+          cpus: '12.0'
         reservations:
-          memory: 4G
-          cpus: '4.0'
+          memory: 8G
+          cpus: '6.0'
 
   frontend:
     build:
