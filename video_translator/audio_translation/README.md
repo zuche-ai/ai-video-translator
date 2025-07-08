@@ -1,238 +1,177 @@
 # Audio Translation Module
 
-This module provides functionality to translate audio files from one language to another, with support for both regular text-to-speech (TTS) and voice cloning.
+This module provides advanced audio translation capabilities with voice cloning and Voice Activity Detection (VAD).
 
 ## Features
 
-- **Audio Transcription**: Uses OpenAI Whisper for accurate speech-to-text conversion
-- **Text Translation**: Translates transcriptions using ArgosTranslate
-- **Voice Cloning**: Clone the original speaker's voice for translated audio using Coqui XTTS
-- **Regular TTS**: Generate translated audio using standard text-to-speech (placeholder for future implementation)
-- **Multiple Audio Formats**: Supports MP3, WAV, M4A, FLAC, OGG, and AAC
-- **Command-Line Interface**: Easy-to-use CLI for batch processing
-- **Comprehensive Testing**: Full test coverage with unit and integration tests
+- **Whisper Transcription**: High-quality speech-to-text using OpenAI's Whisper
+- **Voice Activity Detection**: Automatically identifies voice and non-voice segments
+- **Multi-language Translation**: Translate between multiple languages
+- **Voice Cloning**: Generate translated audio that sounds like the original speaker
+- **Intelligent Audio Stitching**: Preserve non-voice segments (music, sound effects) while translating speech
 
-## Quick Start
+## Workflow
 
-### Command-Line Usage
+The audio translation process follows these steps:
+
+1. **Transcribe Audio**: Convert speech to text using Whisper
+2. **VAD Analysis**: Identify voice and non-voice segments using WebRTC VAD
+3. **Translate Text**: Translate the transcription to the target language
+4. **Adjust Timestamps**: Modify SRT timestamps to exclude non-voice segments
+5. **Voice Cloning**: Generate voice-cloned audio for voice segments
+6. **Extract Non-voice**: Preserve original audio for non-voice segments
+7. **Stitch Audio**: Combine all segments into a continuous audio file
+
+## Usage
+
+### API Endpoint
 
 ```bash
-# Basic audio translation with voice cloning
-python -m video_translator.audio_translation.cli \
-  --input audio.mp3 \
-  --src-lang en \
-  --tgt-lang es \
-  --voice-clone
-
-# Specify custom output path
-python -m video_translator.audio_translation.cli \
-  --input audio.wav \
-  --output translated_audio.wav \
-  --src-lang en \
-  --tgt-lang fr \
-  --voice-clone
-
-# Use different Whisper model size
-python -m video_translator.audio_translation.cli \
-  --input audio.mp3 \
-  --src-lang en \
-  --tgt-lang de \
-  --model-size large \
-  --voice-clone
-
-# List supported audio formats
-python -m video_translator.audio_translation.cli --list-formats
+POST /translate_audio
 ```
 
-### Programmatic Usage
+**Form Data:**
+- `audio`: Input audio file (required)
+- `reference_audio`: Reference audio for voice cloning (required)
+- `src_lang`: Source language code (default: "en")
+- `tgt_lang`: Target language code (default: "es")
+
+**Response:**
+```json
+{
+  "job_id": "uuid-string"
+}
+```
+
+### Python API
 
 ```python
 from video_translator.audio_translation.audio_translator import AudioTranslator
 
-# Create translator with voice cloning
-translator = AudioTranslator(
+# Create translator
+translator = AudioTranslator()
+
+# Translate audio
+output_path = translator.translate_audio(
+    audio_path="input.wav",
     src_lang="en",
     tgt_lang="es",
-    model_size="base",
-    voice_clone=True
+    reference_audio_path="reference.wav",
+    output_path="translated.wav"
 )
+```
 
-# Translate audio file
-output_path = translator.translate_audio(
-    input_path="input_audio.mp3",
-    output_path="translated_audio.mp3"
+### Convenience Function
+
+```python
+from video_translator.audio_translation.audio_translator import translate_audio_file
+
+output_path = translate_audio_file(
+    audio_path="input.wav",
+    src_lang="en",
+    tgt_lang="es",
+    reference_audio_path="reference.wav"
 )
+```
 
-print(f"Translation completed: {output_path}")
+## Progress Tracking
+
+You can track progress using a callback function:
+
+```python
+def progress_callback(step, percent, status_message):
+    print(f"Step {step}: {percent}% - {status_message}")
+
+translator.translate_audio(
+    audio_path="input.wav",
+    src_lang="en",
+    tgt_lang="es",
+    reference_audio_path="reference.wav",
+    progress_hook=progress_callback
+)
 ```
 
 ## Supported Languages
 
-The module supports all languages available in:
-- **Whisper**: For transcription (English, Spanish, French, German, etc.)
-- **ArgosTranslate**: For text translation (100+ language pairs)
-- **Coqui XTTS**: For voice cloning (multilingual support)
+The module supports all languages supported by:
+- **Whisper**: For transcription
+- **ArgosTranslate**: For text translation
+- **XTTS**: For voice cloning
 
-## Supported Audio Formats
+Common language codes:
+- `en`: English
+- `es`: Spanish
+- `fr`: French
+- `de`: German
+- `it`: Italian
+- `pt`: Portuguese
+- `ja`: Japanese
+- `ko`: Korean
+- `zh`: Chinese
 
-- MP3 (.mp3)
-- WAV (.wav)
-- M4A (.m4a)
-- FLAC (.flac)
-- OGG (.ogg)
-- AAC (.aac)
-- OPUS (.opus) - WhatsApp, Discord, WebRTC
+## Audio Formats
 
-## Architecture
+**Input Formats:**
+- WAV, MP3, M4A, FLAC, OGG, AAC, OPUS
 
-The audio translation pipeline consists of three main steps:
+**Output Format:**
+- WAV (16-bit, 22.05kHz)
 
-1. **Transcription**: Convert audio to text using Whisper
-2. **Translation**: Translate text using ArgosTranslate
-3. **Audio Generation**: Generate new audio using voice cloning or TTS
+## Requirements
 
-```
-Input Audio → Whisper → Text → ArgosTranslate → Translated Text → XTTS → Output Audio
-```
+- `whisper`: Speech recognition
+- `argostranslate`: Text translation
+- `TTS`: Voice cloning (XTTS)
+- `webrtcvad`: Voice activity detection
+- `librosa`: Audio processing
+- `ffmpeg`: Audio manipulation
+- `numpy`: Numerical operations
+- `soundfile`: Audio I/O
 
-## Configuration Options
+## Example
 
-### AudioTranslator Parameters
-
-- `src_lang`: Source language code (default: "en")
-- `tgt_lang`: Target language code (default: "es")
-- `model_size`: Whisper model size - "tiny", "base", "small", "medium", "large" (default: "base")
-- `voice_clone`: Whether to use voice cloning instead of regular TTS (default: False)
-
-### CLI Options
-
-- `--input, -i`: Input audio file path (required)
-- `--output, -o`: Output audio file path (auto-generated if not specified)
-- `--src-lang`: Source language code
-- `--tgt-lang`: Target language code
-- `--model-size`: Whisper model size
-- `--voice-clone`: Use voice cloning
-- `--verbose, -v`: Enable verbose logging
-- `--list-formats`: List supported audio formats
-
-## Examples
-
-### Example 1: Basic Translation
-
-```python
-from video_translator.audio_translation.audio_translator import AudioTranslator
-
-translator = AudioTranslator()
-output_path = translator.translate_audio("english_audio.mp3")
-# Output: english_audio_es.mp3
-```
-
-### Example 2: Custom Configuration
-
-```python
-translator = AudioTranslator(
-    src_lang="fr",
-    tgt_lang="de",
-    model_size="large",
-    voice_clone=True
-)
-
-output_path = translator.translate_audio(
-    input_path="french_audio.wav",
-    output_path="german_translation.wav"
-)
-```
-
-### Example 3: Batch Processing
-
-```python
-import os
-from pathlib import Path
-
-translator = AudioTranslator(voice_clone=True)
-
-input_dir = Path("input_audio")
-output_dir = Path("translated_audio")
-output_dir.mkdir(exist_ok=True)
-
-for audio_file in input_dir.glob("*.mp3"):
-    output_path = output_dir / f"translated_{audio_file.name}"
-    translator.translate_audio(
-        input_path=str(audio_file),
-        output_path=str(output_path)
-    )
-```
-
-## Error Handling
-
-The module provides comprehensive error handling:
-
-- **FileNotFoundError**: Input file doesn't exist
-- **ValueError**: Unsupported audio format or empty transcription/translation
-- **RuntimeError**: Transcription, translation, or audio generation failures
-- **NotImplementedError**: Regular TTS not yet implemented (use voice cloning)
+See `examples/audio_translation_example.py` for a complete working example.
 
 ## Testing
 
-Run the tests to ensure everything works correctly:
+Run the test suite:
 
 ```bash
-# Run all audio translation tests
-pytest tests/audio_translation/
-
-# Run with verbose output
-pytest tests/audio_translation/ -v
-
-# Run specific test
-pytest tests/audio_translation/test_audio_translator.py::TestAudioTranslator::test_init_defaults
+python -m pytest tests/audio_translation/test_audio_translator.py
 ```
-
-## Dependencies
-
-The audio translation module requires:
-
-- `openai-whisper`: For audio transcription
-- `argostranslate`: For text translation
-- `TTS` (Coqui): For voice cloning
-- `torch`: For deep learning models
-- `soundfile`: For audio file handling
-- `librosa`: For audio processing
-
-## Future Enhancements
-
-- [ ] Implement regular TTS functionality
-- [ ] Add support for more audio formats
-- [ ] Implement batch processing optimization
-- [ ] Add progress callbacks for long operations
-- [ ] Support for custom voice models
-- [ ] Integration with the web UI
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"Model not found" errors**: Ensure XTTS models are downloaded
-2. **Memory issues**: Use smaller Whisper model sizes
-3. **Slow processing**: Voice cloning is computationally intensive
-4. **Audio quality**: Ensure input audio has good quality and clear speech
+1. **VAD Analysis Fails**: Ensure audio is 16kHz mono
+2. **Voice Cloning Fails**: Check reference audio quality and length
+3. **Translation Fails**: Verify language codes are supported
+4. **Memory Issues**: Reduce audio file size or use smaller models
 
-### Performance Tips
+### Debug Mode
 
-- Use "tiny" or "base" Whisper models for faster processing
-- Ensure sufficient RAM (8GB+ recommended for voice cloning)
-- Use SSD storage for better I/O performance
-- Close other applications to free up system resources
+Enable debug logging:
 
-## Contributing
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
 
-When contributing to the audio translation module:
+## Performance
 
-1. Follow the existing code style
-2. Add tests for new functionality
-3. Update documentation
-4. Test with different audio formats and languages
-5. Consider performance implications
+- **Transcription**: ~1-2x real-time (depends on Whisper model)
+- **Translation**: ~10-100x real-time (depends on text length)
+- **Voice Cloning**: ~0.1-0.5x real-time (depends on XTTS model)
+- **VAD Analysis**: ~10-50x real-time
+
+## Memory Usage
+
+- **Base Model**: ~1GB RAM
+- **Large Model**: ~3GB RAM
+- **XTTS Model**: ~2GB RAM
+- **Total**: ~4-6GB RAM for full pipeline
 
 ## License
 
-This module is part of the video translator project and follows the same license terms. 
+This module is part of the video_translator project and follows the same license terms. 
