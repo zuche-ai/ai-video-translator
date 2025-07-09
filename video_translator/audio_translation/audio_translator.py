@@ -433,16 +433,29 @@ class AudioTranslator:
         if not reference_audio_path:
             raise ValueError("Reference audio path is required for voice cloning")
         
-        # Merge segments into larger chunks for better voice cloning
-        merged_segments = self._merge_segments_for_voice_cloning(segments, max_chunk_duration=10.0)
-        
         audio_files = []
         texts = []
         
-        for i, chunk in enumerate(merged_segments):
-            text = chunk['text'].strip()
+        i = 0
+        while i < len(segments):
+            segment = segments[i]
+            text = segment['text'].strip()
             if text:
-                texts.append(text)
+                full_sentence = text
+                next_index = i + 1
+                
+                # Keep adding segments until we find one that ends with a period
+                while not full_sentence.endswith('.') and next_index < len(segments) and len(full_sentence) < 200:
+                    next_segment = segments[next_index]
+                    next_text = next_segment['text'].strip()
+                    if next_text:
+                        full_sentence += " " + next_text
+                    next_index += 1
+                
+                texts.append(full_sentence)
+                i = next_index  # Skip the segments we just processed
+            else:
+                i += 1
         
         # Generate audio files using voice cloner
         audio_files = self.voice_cloner.batch_clone_voice(
