@@ -413,6 +413,123 @@ class AudioTranslator:
         
         return merged_segments
 
+    def _generate_voice_audio_simple(self, 
+                                   segments: List[Dict], 
+                                   reference_audio_path: Optional[str],
+                                   output_dir: str,
+                                   language: str) -> List[str]:
+        """
+        Generate voice-cloned audio using a simpler approach:
+        1. Combine all text from segments
+        2. Split into natural sentences
+        3. Voice clone each sentence
+        
+        Args:
+            segments: Translated segments
+            reference_audio_path: Path to reference audio
+            output_dir: Directory to save audio files
+            language: Target language
+            
+        Returns:
+            List of paths to generated audio files
+        """
+        if not reference_audio_path:
+            raise ValueError("Reference audio path is required for voice cloning")
+        
+        # Step 1: Combine all text from segments
+        all_text = " ".join([seg['text'].strip() for seg in segments if seg['text'].strip()])
+        logger.info(f"Combined text length: {len(all_text)} characters")
+        logger.info(f"Combined text: {all_text[:200]}...")
+        
+        # Step 2: Split into natural sentences
+        import re
+        
+        # More sophisticated sentence splitting that avoids abbreviations and initials
+        # First, replace common abbreviations with a special marker
+        abbreviations = ['Dr.', 'Mr.', 'Mrs.', 'Ms.', 'Prof.', 'Sr.', 'Jr.', 'Ph.D.', 'M.D.', 'B.A.', 'M.A.', 'Ph.D.']
+        text_with_markers = all_text
+        for abbr in abbreviations:
+            text_with_markers = text_with_markers.replace(abbr, abbr.replace('.', '###PERIOD###'))
+        
+        # Replace single letter initials (like "A." in "David A. Christensen")
+        # Pattern: word boundary + single letter + period + space or end
+        text_with_markers = re.sub(r'\b([A-Z])\.(?=\s|$)', r'\1###PERIOD###', text_with_markers)
+        
+        # Split on sentence endings and preserve the punctuation
+        # Use positive lookbehind to keep the punctuation with the sentence
+        sentences = re.split(r'(?<=[.!?])\s+', text_with_markers)
+        
+        # Restore periods in abbreviations and initials
+        sentences = [s.replace('###PERIOD###', '.') for s in sentences]
+        sentences = [s.strip() for s in sentences if s.strip()]  # Remove empty sentences
+        
+        # Step 3: Split sentences that are too long (over 239 characters for XTTS)
+        MAX_CHAR_LENGTH = 239
+        final_sentences = []
+        
+        for sentence in sentences:
+            if len(sentence) <= MAX_CHAR_LENGTH:
+                final_sentences.append(sentence)
+            else:
+                # Split long sentences at natural break points
+                logger.info(f"Splitting long sentence ({len(sentence)} chars): {sentence[:50]}...")
+                
+                # Try to split at commas first
+                if ',' in sentence:
+                    parts = sentence.split(',')
+                    current_part = parts[0]
+                    
+                    for part in parts[1:]:
+                        if len(current_part + ',' + part) <= MAX_CHAR_LENGTH:
+                            current_part += ',' + part
+                        else:
+                            if current_part.strip():
+                                final_sentences.append(current_part.strip())
+                            current_part = part
+                    
+                    if current_part.strip():
+                        final_sentences.append(current_part.strip())
+                else:
+                    # Split at spaces if no commas
+                    words = sentence.split()
+                    current_part = words[0]
+                    
+                    for word in words[1:]:
+                        if len(current_part + ' ' + word) <= MAX_CHAR_LENGTH:
+                            current_part += ' ' + word
+                        else:
+                            if current_part.strip():
+                                final_sentences.append(current_part.strip())
+                            current_part = word
+                    
+                    if current_part.strip():
+                        final_sentences.append(current_part.strip())
+        
+        sentences = final_sentences
+        
+        logger.info(f"Split into {len(sentences)} sentences:")
+        for i, sentence in enumerate(sentences):
+            logger.info(f"  Sentence {i+1}: {sentence[:100]}...")
+        
+        # Step 3: Voice clone each sentence
+        audio_files = []
+        texts = []
+        
+        for i, sentence in enumerate(sentences):
+            if sentence.strip():
+                texts.append(sentence)
+        
+        # Generate audio files using voice cloner
+        audio_files = self.voice_cloner.batch_clone_voice(
+            reference_audio_path=reference_audio_path,
+            texts=texts,
+            output_dir=output_dir,
+            language=language
+        )
+        
+        logger.info(f"Generated {len(audio_files)} audio files using simple approach")
+        return audio_files
+
     def _generate_voice_audio(self, 
                             segments: List[Dict], 
                             reference_audio_path: Optional[str],
@@ -508,6 +625,57 @@ class AudioTranslator:
         
         return audio_files
     
+    def _stitch_audio_simple(self, voice_files: List[str], output_path: str) -> str:
+        """
+        Simple audio stitching that just concatenates voice-cloned files in order.
+        
+        Args:
+            voice_files: List of voice audio files to concatenate
+            output_path: Path for output audio file
+            
+        Returns:
+            Path to stitched audio file
+        """
+        if not voice_files:
+            raise ValueError("No voice files provided for stitching")
+        
+        logger.info(f"Simple stitching {len(voice_files)} voice files")
+        
+        # Create a temporary file list for ffmpeg
+        temp_list_file = os.path.join(os.path.dirname(output_path), "simple_concat_list.txt")
+        
+        try:
+            # Create concat file
+            with open(temp_list_file, 'w') as f:
+                for audio_file in voice_files:
+                    if os.path.exists(audio_file):
+                        f.write(f"file '{audio_file}'\n")
+                    else:
+                        logger.warning(f"Audio file not found: {audio_file}")
+            
+            # Use ffmpeg to concatenate all files
+            cmd = [
+                'ffmpeg', '-y',
+                '-f', 'concat',
+                '-safe', '0',
+                '-i', temp_list_file,
+                '-c', 'copy',
+                output_path
+            ]
+            
+            subprocess.run(cmd, check=True, capture_output=True)
+            logger.info(f"Simple audio stitching completed: {output_path}")
+            
+            return output_path
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to stitch audio: {e}")
+            raise RuntimeError(f"Audio stitching failed: {e}")
+        finally:
+            # Clean up temp list file
+            if os.path.exists(temp_list_file):
+                os.remove(temp_list_file)
+
     def _stitch_audio_segments(self,
                              voice_files: List[str],
                              non_voice_files: List[str],
