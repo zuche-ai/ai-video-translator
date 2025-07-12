@@ -1,6 +1,7 @@
 import argostranslate.package
 import argostranslate.translate
 from typing import List, Dict, Any
+from .glossary_loader import apply_lds_glossary
 
 def translate_segments(segments: List[Dict[str, Any]], src_lang: str, tgt_lang: str, debug: bool = False) -> List[Dict[str, Any]]:
     """
@@ -50,6 +51,11 @@ def translate_segments(segments: List[Dict[str, Any]], src_lang: str, tgt_lang: 
                 raise ValueError(f"Segment {i} missing 'text' field")
             
             translated_text = argostranslate.translate.translate(segment['text'], src_lang, tgt_lang)
+            
+            # Apply LDS glossary replacements for Spanish translations
+            if tgt_lang == 'es':
+                translated_text = apply_lds_glossary(translated_text)
+            
             translated_segment = segment.copy()
             translated_segment['text'] = translated_text
             translated_segments.append(translated_segment)
